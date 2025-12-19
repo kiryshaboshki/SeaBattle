@@ -22,9 +22,16 @@
                    Margin="10"
                    FontWeight="Bold"/>
 
+        <!-- Список игр (упрощенный вариант) -->
+        <ListBox Grid.Row="1" 
+                 Margin="20,10"
+                 ItemsSource="{Binding Games}"
+                 SelectedItem="{Binding SelectedGame}"
+                 DisplayMemberPath="DisplayText"/>
+
         <!-- Панель кнопок -->
-        <StackPanel Orientation="Horizontal" 
-                    Grid.Row="2" 
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
                     HorizontalAlignment="Center"
                     Margin="10">
             <Button Content="Создать игру" 
@@ -32,28 +39,15 @@
                     Margin="5"
                     Command="{Binding CreateGameCommand}"/>
 
+            <Button Content="Присоединиться" 
+                    Width="120"
+                    Margin="5"
+                    Command="{Binding JoinGameCommand}"/>
+
             <Button Content="Обновить" 
                     Width="80"
                     Margin="5"
                     Command="{Binding RefreshCommand}"/>
         </StackPanel>
-
-        <!-- Заглушка для списка игр -->
-        <Border Grid.Row="1" 
-                BorderBrush="LightGray" 
-                BorderThickness="1"
-                Margin="20">
-            <StackPanel VerticalAlignment="Center" 
-                        HorizontalAlignment="Center">
-                <TextBlock Text="Список игр появится здесь" 
-                           FontSize="16"
-                           Foreground="Gray"
-                           Margin="10"/>
-                <TextBlock Text="(реализация в следующем коммите)" 
-                           FontSize="12"
-                           Foreground="LightGray"
-                           HorizontalAlignment="Center"/>
-            </StackPanel>
-        </Border>
     </Grid>
 </Page>
