@@ -12,7 +12,6 @@
     <Folder Include="API\" />
     <Folder Include="VM\" />
     <Folder Include="View\" />
-    <Folder Include="mvvm\" />
   </ItemGroup>
 
 </Project>
