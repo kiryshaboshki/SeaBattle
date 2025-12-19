@@ -1,7 +1,7 @@
 ﻿using SeaBattle.mvvm;
 using System.Windows.Controls;
 
-namespace SeaBattleWPF.VM
+namespace SeaBattle.VM 
 {
     public class PageControl : BaseVM
     {
