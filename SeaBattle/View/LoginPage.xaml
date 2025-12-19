@@ -4,12 +4,8 @@
       xmlns:vm="clr-namespace:SeaBattle.VM"
       Title="Вход в игру">
 
-    <Page.Resources>
-        <vm:LoginVM x:Key="loginVM"/>
-    </Page.Resources>
-
     <Page.DataContext>
-        <Binding Source="{StaticResource loginVM}"/>
+        <vm:LoginVM/>
     </Page.DataContext>
 
     <Grid>

@@ -5,17 +5,31 @@ namespace SeaBattle.mvvm
 {
     public class CommandVM : ICommand
     {
-        Action action;
+        private readonly Action execute;
+        private readonly Func<bool> canExecute;
 
-        public CommandVM(Action action)
+        public CommandVM(Action execute) : this(execute, null) { }
+
+        public CommandVM(Action execute, Func<bool> canExecute)
         {
-            this.action = action;
+            this.execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            this.canExecute = canExecute;
         }
 
-        public event EventHandler? CanExecuteChanged;
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
 
-        public bool CanExecute(object? parameter) => true;
+        public bool CanExecute(object parameter)
+        {
+            return canExecute?.Invoke() ?? true;
+        }
 
-        public void Execute(object? parameter) => action();
+        public void Execute(object parameter)
+        {
+            execute();
+        }
     }
 }
