@@ -63,8 +63,28 @@ namespace SeaBattle.VM
             set { enemyShipsTotal = value; Signal(); }
         }
 
+        private bool isMyTurn = true;
+        public bool IsMyTurn
+        {
+            get => isMyTurn;
+            set
+            {
+                isMyTurn = value;
+                Signal();
+                UpdateTurnInfo();
+            }
+        }
+
+        private ObservableCollection<string> gameLog = new ObservableCollection<string>();
+        public ObservableCollection<string> GameLog
+        {
+            get => gameLog;
+            set { gameLog = value; Signal(); }
+        }
+
         private Canvas myField;
         private Canvas enemyField;
+        private Random random = new Random();
 
         public CommandVM ExitCommand { get; set; }
         public CommandVM SurrenderCommand { get; set; }
@@ -74,7 +94,7 @@ namespace SeaBattle.VM
             ExitCommand = new CommandVM(() =>
             {
                 var result = MessageBox.Show("Вы уверены, что хотите выйти из игры?",
-                    "Подтверждение выхода", MessageBoxButton.YesNo);
+                    "Подтверждение выхода", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes)
                 {
@@ -86,11 +106,13 @@ namespace SeaBattle.VM
             SurrenderCommand = new CommandVM(() =>
             {
                 var result = MessageBox.Show("Вы уверены, что хотите сдаться?",
-                    "Подтверждение сдачи", MessageBoxButton.YesNo);
+                    "Подтверждение сдачи", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    MessageBox.Show("Вы сдались. Поражение!");
+                    AddToLog("Вы сдались. Поражение!");
+                    MessageBox.Show("Вы сдались. Поражение!", "Сдача",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
                     var pageControl = PageControl.GetInstance();
                     pageControl.CurrentPage = new PageListGames();
                 }
@@ -107,6 +129,26 @@ namespace SeaBattle.VM
             MyShipsAlive = 10;
             EnemyShipsAlive = 10;
             GameStatus = "Расстановка завершена. Ожидание хода...";
+            GameLog.Clear();
+            AddToLog("Игра началась. Расставьте корабли.");
+            AddToLog("Ожидание подключения противника...");
+            UpdateTurnInfo();
+        }
+
+        private void UpdateTurnInfo()
+        {
+            if (IsMyTurn)
+            {
+                CurrentPlayer = "ВАШ ХОД";
+                TurnInfo = "Кликайте по полю противника для выстрела";
+                GameStatus = "Ваша очередь стрелять";
+            }
+            else
+            {
+                CurrentPlayer = "ХОД ПРОТИВНИКА";
+                TurnInfo = "Ожидание хода противника...";
+                GameStatus = "Противник делает ход";
+            }
         }
 
         public void InitializeFields(Canvas myFieldCanvas, Canvas enemyFieldCanvas)
@@ -119,6 +161,7 @@ namespace SeaBattle.VM
 
             // Для демонстрации - отрисовываем тестовые корабли на своем поле
             DrawTestShipsOnMyField();
+            AddToLog("Поля инициализированы. Игра готова.");
         }
 
         private void DrawGrid(Canvas canvas)
@@ -187,7 +230,6 @@ namespace SeaBattle.VM
             if (myField == null) return;
 
             // Очищаем поле
-            // Удаляем только корабли, оставляя сетку
             var childrenToRemove = new System.Collections.Generic.List<UIElement>();
             foreach (UIElement child in myField.Children)
             {
@@ -267,30 +309,152 @@ namespace SeaBattle.VM
 
         public void ProcessShot(int x, int y, bool isMyShot)
         {
-            // Здесь будет логика обработки выстрела
-            // Пока что просто демонстрация
+            if (!IsMyTurn && isMyShot)
+            {
+                MessageBox.Show("Сейчас не ваш ход! Ожидайте хода противника.",
+                    "Не ваш ход", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string cellName = $"{(char)('A' + x)}{y + 1}";
+
             if (isMyShot)
             {
-                // Отрисовываем выстрел на поле противника
-                DrawShotMarker(x, y, Brushes.Red, enemyField);
-                MessageBox.Show($"Выстрел в {Convert.ToChar('A' + x)}{y + 1}");
+                AddToLog($"Ваш выстрел в {cellName}...");
+
+                // Имитация попадания/промаха (в реальном приложении - ответ сервера)
+                bool isHit = random.Next(0, 2) == 0;
+
+                if (isHit)
+                {
+                    DrawHitMarker(x, y, Brushes.DarkRed, enemyField);
+                    EnemyShipsAlive--;
+                    AddToLog($"✓ ПОПАДАНИЕ в {cellName}! У противника осталось кораблей: {EnemyShipsAlive}");
+                    MessageBox.Show($"ПОПАДАНИЕ! {cellName}\nУ противника осталось кораблей: {EnemyShipsAlive}",
+                        "Попадание", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+
+                    // Дополнительный ход при попадании (правила морского боя)
+                    IsMyTurn = true;
+                    AddToLog("Дополнительный ход за попадание!");
+                }
+                else
+                {
+                    DrawMissMarker(x, y, Brushes.Blue, enemyField);
+                    AddToLog($"✗ Промах в {cellName}");
+                    MessageBox.Show($"Промах! {cellName}",
+                        "Промах", MessageBoxButton.OK, MessageBoxImage.Information);
+                    IsMyTurn = false;
+                }
+
+                // Проверка конца игры
+                CheckGameEnd();
             }
         }
 
-        private void DrawShotMarker(int x, int y, Brush color, Canvas canvas)
+        private void DrawHitMarker(int x, int y, Brush color, Canvas canvas)
         {
-            var marker = new Ellipse
+            var hitMarker = new Ellipse
+            {
+                Width = 24,
+                Height = 24,
+                Fill = color,
+                Stroke = Brushes.Black,
+                StrokeThickness = 2
+            };
+
+            Canvas.SetLeft(hitMarker, x * 30 + 3);
+            Canvas.SetTop(hitMarker, y * 30 + 3);
+            canvas.Children.Add(hitMarker);
+        }
+
+        private void DrawMissMarker(int x, int y, Brush color, Canvas canvas)
+        {
+            var missMarker = new Ellipse
             {
                 Width = 20,
                 Height = 20,
                 Fill = color,
                 Stroke = Brushes.Black,
-                StrokeThickness = 1
+                StrokeThickness = 1,
+                Opacity = 0.7
             };
 
-            Canvas.SetLeft(marker, x * 30 + 5);
-            Canvas.SetTop(marker, y * 30 + 5);
-            canvas.Children.Add(marker);
+            Canvas.SetLeft(missMarker, x * 30 + 5);
+            Canvas.SetTop(missMarker, y * 30 + 5);
+            canvas.Children.Add(missMarker);
+        }
+
+        private void CheckGameEnd()
+        {
+            if (EnemyShipsAlive <= 0)
+            {
+                AddToLog("★★★★★ ПОБЕДА! Все корабли противника уничтожены! ★★★★★");
+                MessageBox.Show("ПОБЕДА! 🏆\nВы уничтожили все корабли противника!",
+                    "Победа", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                GameStatus = "Игра завершена - ВЫ ПОБЕДИЛИ! 🎉";
+                IsMyTurn = false;
+            }
+            else if (MyShipsAlive <= 0)
+            {
+                AddToLog("☠☠☠ ПОРАЖЕНИЕ! Все ваши корабли уничтожены ☠☠☠");
+                MessageBox.Show("ПОРАЖЕНИЕ! ☠\nВсе ваши корабли уничтожены.",
+                    "Поражение", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                GameStatus = "Игра завершена - ВЫ ПРОИГРАЛИ";
+                IsMyTurn = false;
+            }
+        }
+
+        private void AddToLog(string message)
+        {
+            string timestamp = DateTime.Now.ToString("HH:mm:ss");
+            GameLog.Add($"[{timestamp}] {message}");
+
+            // Ограничиваем лог последними 20 сообщениями
+            if (GameLog.Count > 20)
+            {
+                GameLog.RemoveAt(0);
+            }
+        }
+
+        // Метод для имитации хода противника (для демонстрации)
+        public void SimulateEnemyTurn()
+        {
+            if (!IsMyTurn)
+            {
+                AddToLog("Противник делает ход...");
+
+                // Имитация задержки
+                Task.Delay(1000).ContinueWith(t =>
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        // Случайный выстрел противника
+                        int x = random.Next(0, 10);
+                        int y = random.Next(0, 10);
+                        string cellName = $"{(char)('A' + x)}{y + 1}";
+
+                        bool isHit = random.Next(0, 2) == 0;
+
+                        if (isHit)
+                        {
+                            DrawHitMarker(x, y, Brushes.DarkOrange, myField);
+                            MyShipsAlive--;
+                            AddToLog($"☠ Противник попал в {cellName}! Ваших кораблей осталось: {MyShipsAlive}");
+                        }
+                        else
+                        {
+                            DrawMissMarker(x, y, Brushes.LightBlue, myField);
+                            AddToLog($"◯ Противник промахнулся в {cellName}");
+                        }
+
+                        // Возвращаем ход игроку
+                        IsMyTurn = true;
+                        AddToLog("Ваш ход!");
+
+                        CheckGameEnd();
+                    });
+                });
+            }
         }
     }
 }

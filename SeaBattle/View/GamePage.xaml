@@ -1,12 +1,12 @@
 ﻿<Page x:Class="SeaBattle.View.GamePage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:local="clr-namespace:SeaBattle.VM"
+      xmlns:vm="clr-namespace:SeaBattle.VM"
       Title="Игровая страница"
       Loaded="Page_Loaded">
 
     <Page.DataContext>
-        <local:GameVM/>
+        <vm:GameVM/>
     </Page.DataContext>
 
     <Grid>
@@ -14,6 +14,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Верхняя панель: информация о игре -->
@@ -248,7 +249,7 @@
                         CornerRadius="3"
                         Padding="10"
                         Height="80">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer x:Name="GameLogScroll" VerticalScrollBarVisibility="Auto">
                         <TextBlock x:Name="GameLog" 
                                    Foreground="White"
                                    TextWrapping="Wrap">

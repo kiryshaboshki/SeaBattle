@@ -1,11 +1,11 @@
 ﻿<Page x:Class="SeaBattle.View.PageListGames"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:local="clr-namespace:SeaBattle.VM"
+      xmlns:vm="clr-namespace:SeaBattle.VM"
       Title="Список игр">
 
     <Page.DataContext>
-        <local:PageListGamesVM/>
+        <vm:PageListGamesVM/>
     </Page.DataContext>
 
     <Grid>
@@ -22,7 +22,7 @@
                    Margin="10"
                    FontWeight="Bold"/>
 
-        <!-- Список игр (упрощенный вариант) -->
+        <!-- Список игр -->
         <ListBox Grid.Row="1" 
                  Margin="20,10"
                  ItemsSource="{Binding Games}"
