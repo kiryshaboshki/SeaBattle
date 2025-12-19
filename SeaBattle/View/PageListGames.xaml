@@ -1,0 +1,59 @@
+﻿<Page x:Class="SeaBattle.View.PageListGames"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="clr-namespace:SeaBattle.VM"
+      Title="Список игр">
+
+    <Page.DataContext>
+        <local:PageListGamesVM/>
+    </Page.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <TextBlock Text="Список доступных игр" 
+                   FontSize="20" 
+                   HorizontalAlignment="Center"
+                   Margin="10"
+                   FontWeight="Bold"/>
+
+        <!-- Панель кнопок -->
+        <StackPanel Orientation="Horizontal" 
+                    Grid.Row="2" 
+                    HorizontalAlignment="Center"
+                    Margin="10">
+            <Button Content="Создать игру" 
+                    Width="120"
+                    Margin="5"
+                    Command="{Binding CreateGameCommand}"/>
+
+            <Button Content="Обновить" 
+                    Width="80"
+                    Margin="5"
+                    Command="{Binding RefreshCommand}"/>
+        </StackPanel>
+
+        <!-- Заглушка для списка игр -->
+        <Border Grid.Row="1" 
+                BorderBrush="LightGray" 
+                BorderThickness="1"
+                Margin="20">
+            <StackPanel VerticalAlignment="Center" 
+                        HorizontalAlignment="Center">
+                <TextBlock Text="Список игр появится здесь" 
+                           FontSize="16"
+                           Foreground="Gray"
+                           Margin="10"/>
+                <TextBlock Text="(реализация в следующем коммите)" 
+                           FontSize="12"
+                           Foreground="LightGray"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>
