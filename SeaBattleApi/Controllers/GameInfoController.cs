@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SeaBattleApi.Auth;
 using SeaBattleLogic;
-using SeaBattleRepository.DTO;
+using SeaBattleRepository.Models;
 using SeaBattleRepository.Implement;
 using System.Security.Claims;
 
@@ -22,19 +22,19 @@ namespace SeaBattleApi.Controllers
 
         [Authorize]
         [HttpPost("CreateGame")]
-        public async Task<ActionResult<GameDTO>> CreateGame()
+        public async Task<ActionResult<Game>> CreateGame()
         {
             int idUser = HttpContextInfo.GetUserID(this.HttpContext);
-            GameDTO game = await gameLogic.CreateGameAsync(idUser);
+            Game game = await gameLogic.CreateGameAsync(idUser);
             return game;
         }
 
         [Authorize]
         [HttpPost("ListGame")]
-        public async Task<ActionResult<List<GameDTO>>> ListGame()
+        public async Task<ActionResult<List<Game>>> ListGame()
         {
             int opponentId = HttpContextInfo.GetUserID(this.HttpContext);
-            List<GameDTO> games = gameLogic.ListFreeGame(opponentId);
+            List<Game> games = gameLogic.ListFreeGame(opponentId);
             return games;
         }
 

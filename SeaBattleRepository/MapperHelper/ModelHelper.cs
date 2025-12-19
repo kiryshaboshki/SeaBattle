@@ -1,4 +1,4 @@
-﻿using SeaBattleDB.DB;
+﻿using SeaBattleRepository.Models;
 using SeaBattleRepository.DTO;
 
 namespace SeaBattleRepository.MapperHelper

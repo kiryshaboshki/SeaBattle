@@ -56,6 +56,7 @@ namespace SeaBattleApi.Controllers
             {
                 Login = data.Login,
                 Password = data.Password,
+                Rating = 0
             });
 
             await repositoryUser.SaveAsync();

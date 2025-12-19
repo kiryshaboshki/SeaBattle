@@ -1,72 +1,93 @@
-﻿using SeaBattleRepository.DTO;
+﻿using SeaBattleRepository.Models;
 using SeaBattleRepository.Implement;
 
 namespace SeaBattleLogic
 {
     public class GameLogic
     {
-        readonly RepositoryGame repositoryGame;
-        readonly RepositoryUser repositoryUser;
+        readonly RepositoryGame _repositoryGame;
+        readonly RepositoryUser _repositoryUser;
 
         public GameLogic(RepositoryGame repositoryGame, RepositoryUser repositoryUser)
         {
-            this.repositoryGame = repositoryGame;
-            this.repositoryUser = repositoryUser;
+            _repositoryGame = repositoryGame;
+            _repositoryUser = repositoryUser;
         }
 
-        public async Task<GameDTO> CreateGameAsync(int idUser)
+        public async Task<Game> CreateGameAsync(int userId)
         {
-            GameDTO gameDTO = new GameDTO
+            var game = new Game
             {
-                Creator = await repositoryUser.SearchEntryByConditionAsync(s => s.Id == idUser),
-                IdUserNextTurn = idUser,
-                FieldUser1 = new byte[1],
-                FieldUser2 = new byte[1],
+                CreatorUserId = userId,
+                IdUserNextTurn = userId,
+                Status = 0, // создана
+                FieldUser1 = new byte[100], // пока пустое поле
+                FieldUser2 = new byte[100],
+                UserIds = new List<int> { userId }
             };
-            gameDTO.Id = await repositoryGame.CreateAsync(gameDTO);
-            return gameDTO;
+            
+            return await _repositoryGame.CreateAsync(game);
         }
 
-        public List<GameDTO> ListFreeGame(int opponentId)
+        public List<Game> ListFreeGame(int opponentId)
         {
-            return repositoryGame.GetByCondition(s => s.Status == 0 && s.CreatorUserId != opponentId).ToList();
+            return _repositoryGame.GetByCondition(s => 
+                s.Status == 0 && 
+                s.CreatorUserId != opponentId &&
+                (s.OpponentUserId == null || s.OpponentUserId == 0)
+            ).ToList();
         }
 
-        public async Task<bool> JoinGameAsync(int opponentId, int idGame)
+        public async Task<bool> JoinGameAsync(int opponentId, int gameId)
         {
-            var game = await repositoryGame.SearchEntryByConditionAsync(s => s.Id == idGame && s.CreatorUserId != opponentId);
+            var game = await _repositoryGame.SearchEntryByConditionAsync(s => 
+                s.Id == gameId && 
+                s.CreatorUserId != opponentId && 
+                s.Status == 0);
+                
             if (game.Id == 0)
-                throw new Exception($"not found game by id {idGame}");
-            var userOpponent = await repositoryUser.SearchEntryByConditionAsync(s => s.Id == opponentId);
-            if (userOpponent.Id == 0)
-                throw new Exception($"not found opponent by id {opponentId}");
-            game.Opponent = userOpponent;
-            var field1 = FieldGeneration.Execute();
-            game.FieldUser1 = FieldGeneration.GetOneDimensionField(field1);
-            var field2 = FieldGeneration.Execute();
-            game.FieldUser2 = FieldGeneration.GetOneDimensionField(field2);
-            game.Status = 1;
-            game.IdUserNextTurn = game.Creator.Id;
-            await repositoryGame.UpdateAsync(game);
-            await repositoryGame.SaveAsync();
+                throw new Exception($"Game not found or not available: {gameId}");
+                
+            var opponent = await _repositoryUser.GetUserByIdAsync(opponentId);
+            if (opponent == null)
+                throw new Exception($"Opponent not found: {opponentId}");
+
+            // Обновляем игру
+            game.OpponentUserId = opponentId;
+            game.UserIds.Add(opponentId);
+            
+            // Генерируем поля для обоих игроков
+            var field2D_1 = FieldGeneration.Execute();
+            var field2D_2 = FieldGeneration.Execute();
+            
+            game.FieldUser1 = FieldGeneration.GetOneDimensionField(field2D_1);
+            game.FieldUser2 = FieldGeneration.GetOneDimensionField(field2D_2);
+            
+            game.Status = 1; // игра началась
+            game.IdUserNextTurn = game.CreatorUserId;
+            
+            await _repositoryGame.UpdateAsync(game);
+            await _repositoryUser.AddGameToUserAsync(opponentId, gameId);
+            
             return true;
         }
 
-        public async Task<GameTurn> CheckTurnAsync(int userId, int idGame)
+        public async Task<GameTurn> CheckTurnAsync(int userId, int gameId)
         {
-            var game = await repositoryGame.SearchEntryByConditionAsync(s => s.Id == idGame);
+            var game = await _repositoryGame.SearchEntryByConditionAsync(s => s.Id == gameId);
             if (game.Id == 0)
-                throw new Exception($"not found game by id {idGame}");
-            var userOpponent = await repositoryUser.SearchEntryByConditionAsync(s => s.Id == userId);
-            if (userOpponent.Id == 0)
-                throw new Exception($"not found opponent by id {userId}");
+                throw new Exception($"Game not found: {gameId}");
+                
+            var user = await _repositoryUser.GetUserByIdAsync(userId);
+            if (user == null)
+                throw new Exception($"User not found: {userId}");
 
             if (game.IdUserNextTurn == userId)
             {
                 return new GameTurn
                 {
-                    FieldUser = game.Creator.Id == userId
-                        ? game.FieldUser1 : game.FieldUser2,
+                    IsMyTurn = true,
+                    FieldUser = game.CreatorUserId == userId ? game.FieldUser1 : game.FieldUser2,
                     IdUserNextTurn = userId
                 };
             }
@@ -74,49 +95,70 @@ namespace SeaBattleLogic
             {
                 return new GameTurn
                 {
+                    IsMyTurn = false,
                     IdUserNextTurn = game.IdUserNextTurn,
                     IdWinner = game.IdUserWinner ?? 0
                 };
             }
         }
 
-        public async Task<TurnResult> MakeTurnAsync(int userId, int idGame, int x, int y)
+        public async Task<TurnResult> MakeTurnAsync(int userId, int gameId, int x, int y)
         {
-            TurnResult turnResult = TurnResult.Lose;
-            var game = await repositoryGame.SearchEntryByConditionAsync(s => s.Id == idGame);
+            var game = await _repositoryGame.SearchEntryByConditionAsync(s => s.Id == gameId);
             if (game.Id == 0)
-                throw new Exception($"not found game by id {idGame}");
-            var user = await repositoryUser.SearchEntryByConditionAsync(s => s.Id == userId);
-            if (user.Id == 0)
-                throw new Exception($"not found user by id {userId}");
-
+                throw new Exception($"Game not found: {gameId}");
+                
             if (game.IdUserNextTurn != userId)
-                throw new Exception($"next turn is not for user id {userId}");
+                throw new Exception($"Not your turn. Next turn is for user: {game.IdUserNextTurn}");
 
-            var fieldTarget = game.Creator.Id == userId ? game.FieldUser2 : game.FieldUser1;
-            var targetCell = x + 10 * y;
-            if (fieldTarget[targetCell] == 1)
+            // Проверяем координаты
+            if (x < 0 || x >= 10 || y < 0 || y >= 10)
+                throw new Exception($"Invalid coordinates: x={x}, y={y} (must be 0-9)");
+
+            // Определяем какое поле атакуем
+            var targetField = game.CreatorUserId == userId ? game.FieldUser2 : game.FieldUser1;
+            var targetCell = x + 10 * y; // поле 10x10
+            
+            if (targetCell < 0 || targetCell >= 100)
+                throw new Exception($"Invalid cell index: {targetCell}");
+
+            if (targetField[targetCell] == 1) // попадание в корабль
             {
-                turnResult = TurnResult.Hit;
-                fieldTarget[targetCell] = 2;
-                if (fieldTarget.Count(s => s == 1) == 0)
+                targetField[targetCell] = 2; // помечаем попадание
+                
+                // Проверяем победу (все корабли потоплены)
+                bool allShipsSunk = !targetField.Any(cell => cell == 1);
+                
+                if (allShipsSunk)
                 {
-                    turnResult = TurnResult.Winner;
                     game.IdUserWinner = userId;
-                    game.Status = 2;
+                    game.Status = 2; // игра завершена
+                    await _repositoryGame.UpdateAsync(game);
+                    
+                    return TurnResult.Winner;
                 }
-                game.IdUserNextTurn = userId;
+                
+                game.IdUserNextTurn = userId; // повторный ход при попадании
+                game.DatetimeLastTurn = DateTime.Now;
+                await _repositoryGame.UpdateAsync(game);
+                
+                return TurnResult.Hit;
             }
-            else
+            else if (targetField[targetCell] == 0) // промах (пустая клетка)
             {
-                fieldTarget[targetCell] = 3;
-                game.IdUserNextTurn = game.Creator.Id == userId ? game.Opponent.Id : game.Creator.Id;
+                targetField[targetCell] = 3; // помечаем промах
+                // Передаём ход другому игроку
+                game.IdUserNextTurn = game.CreatorUserId == userId ? 
+                    (game.OpponentUserId ?? 0) : game.CreatorUserId;
+                game.DatetimeLastTurn = DateTime.Now;
+                await _repositoryGame.UpdateAsync(game);
+                
+                return TurnResult.Miss;
             }
-            game.DatetimeLastTurn = DateTime.Now;
-            await repositoryGame.UpdateAsync(game);
-            await repositoryGame.SaveAsync();
-
-            return turnResult;
+            else // уже стреляли сюда
+            {
+                throw new Exception($"Cell already attacked: x={x}, y={y}");
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SeaBattleDB.DB;
+using SeaBattleRepository.Models;
+using SeaBattleRepository.DTO;
 using SeaBattleRepository.Interfaces;
 using System.Linq.Expressions;
 
@@ -43,11 +44,6 @@ namespace SeaBattleRepository.Implement
         {
             var entity = await context.Set<T>().FindAsync(id);
             return toDTO(entity);
-        }
-
-        public async Task SaveAsync()
-        { 
-            await context.SaveChangesAsync();
         }
 
         public async Task<V> SearchEntryByConditionAsync(Expression<Func<T, bool>> condition)

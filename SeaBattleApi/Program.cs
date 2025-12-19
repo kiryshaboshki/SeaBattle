@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using SeaBattleApi.Auth;
 using SeaBattleApi.Middleware;
-using SeaBattleDB.DB;
+using SeaBattleRepository.Models;
+using SeaBattleRepository.DTO;
 using SeaBattleLogic;
 using SeaBattleRepository.Implement;
 
@@ -14,8 +15,6 @@ namespace SeaBattleApi
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-
-            // Add services to the container.
 
             builder.Services.AddControllers().AddJsonOptions(s =>
             {
@@ -36,17 +35,14 @@ namespace SeaBattleApi
                         ValidateIssuerSigningKey = true,
                     };
                 });
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-            builder.Services.AddDbContext<User29Context>();
             builder.Services.AddScoped<RepositoryGame>();
             builder.Services.AddScoped<RepositoryUser>();
             builder.Services.AddScoped<GameLogic>();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();

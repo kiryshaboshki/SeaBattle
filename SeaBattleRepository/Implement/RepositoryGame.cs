@@ -1,53 +1,121 @@
-﻿using SeaBattleDB.DB;
-using SeaBattleRepository.DTO;
-using SeaBattleRepository.MapperHelper;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using SeaBattleRepository.Models;
+using System.Text.Json;
 
 namespace SeaBattleRepository.Implement
 {
-    public class RepositoryGame : RepositoryBase<Game, GameDTO>
+    public class RepositoryGame
     {
-        public RepositoryGame(User29Context context) :
-            base(context, DTOHelper.ToDTO)
+        private readonly string _gamesFilePath = "Data/games.json";
+        private List<Game> _games;
+        private readonly object _lock = new object();
+
+        public RepositoryGame()
         {
+            LoadData();
         }
 
-        public override async Task<int> CreateAsync(GameDTO entity)
+        private void LoadData()
         {
-            // если мы будем сохранять объект таким образом
-            // то мы получим ошибку
-            // потому что есть коллекция с юзерами
-            // которые уже есть в бentity.ToModel()д
-            // но метод Add помечает всю иерархию объектов
-            // как новые записи
-            //context.Games.Add(entity.ToModel());
-            // поэтому добавляем объект через присоединение
-            // и изменение статуса на "добавленный"
-            var model = entity.ToModel();
-            context.Games.Attach(model);
-            context.Games.Entry(model).State = 
-                Microsoft.EntityFrameworkCore.EntityState.Added;
-            await SaveAsync();
-            return model.Id;
+            lock (_lock)
+            {
+                if (File.Exists(_gamesFilePath))
+                {
+                    var json = File.ReadAllText(_gamesFilePath);
+                    _games = JsonSerializer.Deserialize<List<Game>>(json) ?? new List<Game>();
+                }
+                else
+                {
+                    _games = new List<Game>();
+                    SaveGames();
+                }
+            }
         }
 
-        public override async Task UpdateAsync(GameDTO entity)
+        public List<Game> GetByCondition(Func<Game, bool> predicate)
         {
-            var find = await context.Games.FindAsync(entity.Id);
-            if (find == null)
-                throw new Exception($"game with id {entity.Id} not found");
+            return _games.Where(predicate).ToList();
+        }
 
-            var model = entity.ToModel();
-            context.Games.Entry(find).CurrentValues.SetValues(model);
-            foreach (var user in model.IdUsers)
-                if (find.IdUsers.FirstOrDefault(s => s.Id == user.Id) == null)
-                    find.IdUsers.Add(await context.Users.FindAsync(user.Id));
-               
+        public async Task<Game> GetByIdAsync(int id)
+        {
+            return _games.FirstOrDefault(g => g.Id == id);
+        }
+
+        public async Task<Game> CreateAsync(Game game)
+        {
+            lock (_lock)
+            {
+                var newId = _games.Any() ? _games.Max(g => g.Id) + 1 : 1;
+                game.Id = newId;
+                game.CreatedAt = DateTime.UtcNow;
+                _games.Add(game);
+                SaveGames();
+                return game;
+            }
+        }
+
+        public async Task UpdateAsync(Game game)
+        {
+            lock (_lock)
+            {
+                var existing = _games.FirstOrDefault(g => g.Id == game.Id);
+                if (existing != null)
+                {
+                    existing.Status = game.Status;
+                    existing.IdUserWinner = game.IdUserWinner;
+                    existing.UserIds = game.UserIds;
+                    SaveGames();
+                }
+            }
+        }
+
+        public async Task AddUserToGameAsync(int gameId, int userId)
+        {
+            lock (_lock)
+            {
+                var game = _games.FirstOrDefault(g => g.Id == gameId);
+                if (game != null && !game.UserIds.Contains(userId))
+                {
+                    game.UserIds.Add(userId);
+                    SaveGames();
+                }
+            }
+        }
+
+        public async Task<Game> SearchEntryByConditionAsync(Func<Game, bool> predicate)
+        {
+            return _games.FirstOrDefault(predicate) ?? new Game();
+        }
+
+        public async Task<List<Game>> GetAllAsync()
+        {
+            return _games;
+        }
+
+        public async Task<Game> GetGameWithUsersAsync(int gameId, RepositoryUser userRepo)
+        {
+            var game = _games.FirstOrDefault(g => g.Id == gameId);
+            if (game == null) return new Game();
+            
+            return game;
+        }
+
+        public async Task SaveAsync()
+        {
             await Task.CompletedTask;
+        }
+
+        private void SaveGames()
+        {
+            var directory = Path.GetDirectoryName(_gamesFilePath);
+            if (!Directory.Exists(directory) && directory != null)
+                Directory.CreateDirectory(directory);
+                
+            var json = JsonSerializer.Serialize(_games, new JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+            File.WriteAllText(_gamesFilePath, json);
         }
     }
 }

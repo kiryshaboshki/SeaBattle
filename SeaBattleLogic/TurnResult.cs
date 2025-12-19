@@ -3,7 +3,7 @@
     public enum TurnResult
     { 
         Hit,
-        Lose,
+        Miss,
         Winner
     }
 }
