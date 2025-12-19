@@ -1,10 +1,9 @@
 ﻿using SeaBattle.API;
 using SeaBattle.mvvm;
 using SeaBattle.Models;
+using SeaBattle.View;
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -59,8 +58,10 @@ namespace SeaBattle.VM
 
             if (result.Success)
             {
-                MessageBox.Show("Игра создана! Ожидаем соперника...");
-                await LoadGames();
+                MessageBox.Show("Игра создана! Переход на игровую страницу...");
+                // Переход на игровую страницу
+                var pageControl = PageControl.GetInstance();
+                pageControl.CurrentPage = new GamePage();
             }
             else
             {
@@ -72,41 +73,35 @@ namespace SeaBattle.VM
         {
             try
             {
-                var result = await Client.Instance.PostAsync("GameInfo/ListGame");
-
-                if (result.Success && !string.IsNullOrEmpty(result.Response))
+                // Заглушка для теста
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    // Парсим ответ (в реальном приложении здесь был бы десериализация JSON)
-                    Application.Current.Dispatcher.Invoke(() =>
+                    Games.Clear();
+
+                    Games.Add(new GameInfo
                     {
-                        Games.Clear();
-
-                        // Заглушка для теста - добавляем тестовые игры
-                        Games.Add(new GameInfo
-                        {
-                            Id = 1,
-                            CreatorName = "Игрок1",
-                            StartTime = DateTime.Now.AddMinutes(-30),
-                            Status = "Ожидает игрока"
-                        });
-
-                        Games.Add(new GameInfo
-                        {
-                            Id = 2,
-                            CreatorName = "Игрок2",
-                            StartTime = DateTime.Now.AddMinutes(-15),
-                            Status = "В процессе"
-                        });
-
-                        Games.Add(new GameInfo
-                        {
-                            Id = 3,
-                            CreatorName = "Игрок3",
-                            StartTime = DateTime.Now,
-                            Status = "Ожидает игрока"
-                        });
+                        Id = 1,
+                        CreatorName = "Игрок1",
+                        StartTime = DateTime.Now.AddMinutes(-30),
+                        Status = "Ожидает игрока"
                     });
-                }
+
+                    Games.Add(new GameInfo
+                    {
+                        Id = 2,
+                        CreatorName = "Игрок2",
+                        StartTime = DateTime.Now.AddMinutes(-15),
+                        Status = "В процессе"
+                    });
+
+                    Games.Add(new GameInfo
+                    {
+                        Id = 3,
+                        CreatorName = "Игрок3",
+                        StartTime = DateTime.Now,
+                        Status = "Ожидает игрока"
+                    });
+                });
             }
             catch (Exception ex)
             {
@@ -126,8 +121,10 @@ namespace SeaBattle.VM
 
             if (result.Success)
             {
-                MessageBox.Show($"Вы присоединились к игре {SelectedGame.CreatorName}!");
-                // Здесь позже будет переход на игровую страницу
+                MessageBox.Show($"Вы присоединились к игре {SelectedGame.CreatorName}! Переход на игровую страницу...");
+                // Переход на игровую страницу
+                var pageControl = PageControl.GetInstance();
+                pageControl.CurrentPage = new GamePage();
             }
             else
             {
