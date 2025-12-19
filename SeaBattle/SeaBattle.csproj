@@ -10,7 +10,6 @@
 
   <ItemGroup>
     <Folder Include="API\" />
-    <Folder Include="VM\" />
     <Folder Include="View\" />
   </ItemGroup>
 
