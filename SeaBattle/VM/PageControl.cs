@@ -1,6 +1,9 @@
 ﻿using SeaBattle.mvvm;
 using System.Windows.Controls;
-
+using SeaBattle.mvvm;
+using SeaBattle.API;
+using System.Threading.Tasks;
+using System.Windows;
 namespace SeaBattle.VM 
 {
     public class PageControl : BaseVM

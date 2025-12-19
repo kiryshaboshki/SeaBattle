@@ -1,6 +1,5 @@
 ﻿using SeaBattle.API;
 using SeaBattle.mvvm;
-using SeaBattle.View;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -22,29 +21,43 @@ namespace SeaBattle.VM
         {
             LoginCommand = new CommandVM(async () =>
             {
+                if (string.IsNullOrEmpty(LoginText) || passwordBox == null || string.IsNullOrEmpty(passwordBox.Password))
+                {
+                    MessageBox.Show("Введите логин и пароль");
+                    return;
+                }
+
                 var result = await Client.Instance.PostAsync(
                     $"Auth/GetToken?login={LoginText}&password={passwordBox.Password}");
 
                 if (result.Success)
                 {
                     Client.Instance.SetToken(result.Response);
-                    MessageBox.Show("Успешный вход!");
-                    // Здесь позже будет переход на список игр
+
+                    // Переход на страницу списка игр
+                    var pageControl = PageControl.GetInstance();
+                    pageControl.CurrentPage = new View.PageListGames();
                 }
                 else
                 {
-                    MessageBox.Show($"Ошибка: {result.Response}");
+                    MessageBox.Show($"Ошибка входа: {result.Response}");
                 }
             });
 
             RegistrationCommand = new CommandVM(async () =>
             {
+                if (string.IsNullOrEmpty(LoginText) || passwordBox == null || string.IsNullOrEmpty(passwordBox.Password))
+                {
+                    MessageBox.Show("Введите логин и пароль для регистрации");
+                    return;
+                }
+
                 var result = await Client.Instance.PostAsync("Auth/Registration",
                     new { Login = LoginText, Password = passwordBox.Password });
 
                 if (result.Success)
                 {
-                    MessageBox.Show("Регистрация успешна!");
+                    MessageBox.Show("Регистрация успешна! Выполняется вход...");
                     // Автоматически выполняем вход после регистрации
                     LoginCommand.Execute(null);
                 }
