@@ -1,6 +1,7 @@
 ﻿using SeaBattle.Models;
 using System;
 using System.Threading.Tasks;
+using SeaBattle;
 
 namespace SeaBattle.API
 {
@@ -163,10 +164,10 @@ namespace SeaBattle.API
     }
 
     // Статический класс для хранения текущей игры (временное решение)
-    public static class CurrentGame
-    {
-        public static int Id { get; set; } = 1;
-        public static bool IsOnline { get; set; } = false;
-        public static string OpponentName { get; set; } = "Противник";
-    }
+    //public static class CurrentGame
+    //{
+    //    public static int Id { get; set; } = 1;
+    //    public static bool IsOnline { get; set; } = false;
+    //    public static string OpponentName { get; set; } = "Противник";
+    //}
 }

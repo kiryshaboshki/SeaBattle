@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using SeaBattle.VM; // УБЕДИТЕСЬ ЧТО ЭТОТ USING ЕСТЬ
 
 namespace SeaBattle.View
 {
@@ -15,11 +16,8 @@ namespace SeaBattle.View
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            // Инициализируем поля при загрузке страницы
             var vm = (VM.GameVM)DataContext;
             vm.InitializeFields(MyField, EnemyField);
-
-            // Инициализируем лог
             UpdateGameLog();
         }
 
@@ -46,7 +44,6 @@ namespace SeaBattle.View
             {
                 var run = new Run(logEntry + "\n");
 
-                // Цветовое кодирование сообщений
                 if (logEntry.Contains("ПОБЕДА") || logEntry.Contains("ПОПАДАНИЕ") || logEntry.Contains("✓"))
                     run.Foreground = Brushes.Green;
                 else if (logEntry.Contains("ПОРАЖЕНИЕ") || logEntry.Contains("☠"))
@@ -59,13 +56,12 @@ namespace SeaBattle.View
                 GameLog.Inlines.Add(run);
             }
 
-            // Прокручиваем вниз
             GameLogScroll.ScrollToEnd();
         }
 
         private void SimulateEnemyTurn_Click(object sender, RoutedEventArgs e)
         {
-            // Кнопка для демонстрации хода противника
+            // Теперь метод существует в GameVM
             var vm = (VM.GameVM)DataContext;
             vm.SimulateEnemyTurn();
             UpdateGameLog();

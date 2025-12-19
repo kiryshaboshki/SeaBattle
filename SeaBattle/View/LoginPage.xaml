@@ -18,6 +18,20 @@
                        Margin="0,0,0,30"
                        FontWeight="Bold"/>
 
+            <!-- НОВАЯ КНОПКА -->
+            <Button Content="🎮 Быстрый старт (оффлайн)" 
+                    Margin="0,0,0,20"
+                    Padding="10,5"
+                    Background="#2ECC71"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    Click="OfflineMode_Click"/>
+
+            <TextBlock Text="Или войдите:" 
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,10"
+                       Foreground="Gray"/>
+
             <TextBlock Text="Логин:"/>
             <TextBox Text="{Binding LoginText, UpdateSourceTrigger=PropertyChanged}"
                      Margin="0,5,0,10"/>

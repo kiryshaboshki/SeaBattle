@@ -7,13 +7,14 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Collections.Generic;
 using System.Linq;
+using SeaBattle; // ДОБАВИТЬ USING
 
 namespace SeaBattle.VM
 {
     public class ShipPlacementVM : BaseVM
     {
-        private int[,] gameField = new int[10, 10]; // 0 - пусто, 1 - корабль
-        private List<Ship> placedShips = new List<Ship>();
+        private int[,] gameField = new int[10, 10];
+        private List<ShipPlacementData> placedShips = new List<ShipPlacementData>(); // ИЗМЕНИТЬ ТИП
 
         public ObservableCollection<ShipModel> AvailableShips { get; set; }
 
@@ -67,10 +68,7 @@ namespace SeaBattle.VM
 
             SelectedShip = AvailableShips[0];
 
-            PlaceShipCommand = new CommandVM(() =>
-            {
-                // Команда будет вызываться при клике на поле
-            });
+            PlaceShipCommand = new CommandVM(() => { });
 
             ClearFieldCommand = new CommandVM(() =>
             {
@@ -87,42 +85,60 @@ namespace SeaBattle.VM
                     return;
                 }
 
-                // Отправляем расстановку на сервер
+                if (!CurrentGame.IsOnline)
+                {
+                    MessageBox.Show("Начинаем оффлайн игру против компьютера!\n\n" +
+                                   "Корабли расставлены. Удачи в битве!",
+                        "Оффлайн режим", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    SavePlacementForGame();
+                    var pageControl = PageControl.GetInstance();
+                    pageControl.CurrentPage = new GamePage();
+                    return;
+                }
+
                 StatusMessage = "Отправка расстановки на сервер...";
 
                 try
                 {
-                    // Преобразуем поле в массив для сервера
                     byte[] fieldData = ConvertFieldToByteArray();
-
-                    // Отправляем на сервер
                     var result = await API.GameAPI.SendFieldPlacement(fieldData);
 
                     if (result.Success)
                     {
-                        MessageBox.Show("Расстановка принята! Начинаем игру...",
+                        MessageBox.Show("Расстановка принята сервером!\n\n" +
+                                       "Ожидаем подключения противника...",
                             "Успешно", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                        // Переход на игровую страницу
+                        SavePlacementForGame();
                         var pageControl = PageControl.GetInstance();
                         pageControl.CurrentPage = new GamePage();
                     }
                     else
                     {
                         StatusMessage = $"Ошибка: {result.Message}";
-                        MessageBox.Show($"Ошибка отправки расстановки: {result.Message}",
+                        MessageBox.Show($"Ошибка отправки расстановки:\n{result.Message}\n\n" +
+                                       "Попробуйте еще раз или перейдите в оффлайн-режим.",
                             "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
                 catch (System.Exception ex)
                 {
                     StatusMessage = "Ошибка подключения к серверу";
-                    MessageBox.Show($"Ошибка: {ex.Message}\nИгра начнется в оффлайн-режиме.",
-                        "Ошибка сети", MessageBoxButton.OK, MessageBoxImage.Warning);
 
-                    // Переход в оффлайн-режим
-                    var pageControl = PageControl.GetInstance();
-                    pageControl.CurrentPage = new GamePage();
+                    var result = MessageBox.Show(
+                        $"Не удалось подключиться к серверу:\n{ex.Message}\n\n" +
+                        "Хотите продолжить в оффлайн-режиме против компьютера?",
+                        "Ошибка сети", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        CurrentGame.IsOnline = false;
+                        CurrentGame.OpponentName = "Компьютер";
+                        SavePlacementForGame();
+                        var pageControl = PageControl.GetInstance();
+                        pageControl.CurrentPage = new GamePage();
+                    }
                 }
             });
 
@@ -163,8 +179,7 @@ namespace SeaBattle.VM
                 return false;
             }
 
-            // Размещаем корабль
-            var ship = new Ship
+            var ship = new ShipPlacementData // ИЗМЕНИТЬ НА ShipPlacementData
             {
                 Size = SelectedShip.Size,
                 IsHorizontal = IsHorizontal,
@@ -178,23 +193,20 @@ namespace SeaBattle.VM
                 int cellX = IsHorizontal ? x + i : x;
                 int cellY = IsHorizontal ? y : y + i;
 
-                gameField[cellX, cellY] = 1;
+                gameField[cellX, cellY] = SelectedShip.Size;
                 ship.Cells.Add((cellX, cellY));
             }
 
             placedShips.Add(ship);
             SelectedShip.Placed++;
 
-            // Проверяем, все ли корабли размещены
             CheckAllShipsPlaced();
-
             StatusMessage = $"Корабль ({SelectedShip.Size}-палубный) размещен. Осталось разместить: {GetRemainingShips()}";
             return true;
         }
 
         private bool CanPlaceShip(int x, int y, int size, bool horizontal)
         {
-            // Проверяем границы поля
             if (horizontal)
             {
                 if (x + size > 10) return false;
@@ -204,16 +216,13 @@ namespace SeaBattle.VM
                 if (y + size > 10) return false;
             }
 
-            // Проверяем клетки и соседние
             for (int i = 0; i < size; i++)
             {
                 int cellX = horizontal ? x + i : x;
                 int cellY = horizontal ? y : y + i;
 
-                // Проверяем саму клетку
                 if (gameField[cellX, cellY] != 0) return false;
 
-                // Проверяем соседние клетки (включая диагонали)
                 for (int dx = -1; dx <= 1; dx++)
                 {
                     for (int dy = -1; dy <= 1; dy++)
@@ -266,8 +275,7 @@ namespace SeaBattle.VM
 
                         if (CanPlaceShip(x, y, shipModel.Size, horizontal))
                         {
-                            // Размещаем корабль
-                            var ship = new Ship
+                            var ship = new ShipPlacementData // ИЗМЕНИТЬ
                             {
                                 Size = shipModel.Size,
                                 IsHorizontal = horizontal,
@@ -281,7 +289,7 @@ namespace SeaBattle.VM
                                 int cellX = horizontal ? x + j : x;
                                 int cellY = horizontal ? y : y + j;
 
-                                gameField[cellX, cellY] = 1;
+                                gameField[cellX, cellY] = shipModel.Size;
                                 ship.Cells.Add((cellX, cellY));
                             }
 
@@ -303,7 +311,7 @@ namespace SeaBattle.VM
             CanStartGame = AvailableShips.All(s => s.Placed == s.Count);
             if (CanStartGame)
             {
-                StatusMessage = "Все корабли размещены! Можно начинать игру.";
+                StatusMessage = "✓ Все корабли размещены! Можно начинать игру.";
             }
         }
 
@@ -322,8 +330,6 @@ namespace SeaBattle.VM
 
         private byte[] ConvertFieldToByteArray()
         {
-            // Преобразуем поле в массив байт для отправки на сервер
-            // Каждый байт: 0 - пусто, 1 - корабль
             byte[] result = new byte[100];
 
             for (int i = 0; i < 10; i++)
@@ -337,11 +343,26 @@ namespace SeaBattle.VM
             return result;
         }
 
-        public List<Ship> GetPlacedShips() => placedShips;
+        private void SavePlacementForGame()
+        {
+            // Сохраняем в GameFieldData
+            GameFieldData.PlayerField = gameField;
+            GameFieldData.PlayerShips = placedShips.Select(s => new GameFieldShip
+            {
+                Size = s.Size,
+                IsHorizontal = s.IsHorizontal,
+                X = s.X,
+                Y = s.Y,
+                Cells = s.Cells
+            }).ToList();
+        }
+
+        public List<ShipPlacementData> GetPlacedShips() => placedShips; // ИЗМЕНИТЬ ВОЗВРАЩАЕМЫЙ ТИП
         public int[,] GetGameField() => gameField;
     }
 
-    public class Ship
+    // ПЕРЕИМЕНОВАНО из Ship
+    public class ShipPlacementData
     {
         public int Size { get; set; }
         public bool IsHorizontal { get; set; }
@@ -360,4 +381,6 @@ namespace SeaBattle.VM
         public int Placed { get; set; }
         public string Description { get; set; }
     }
+
+
 }
