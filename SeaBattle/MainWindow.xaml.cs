@@ -1,24 +1,25 @@
-﻿using System.Text;
+﻿using SeaBattleWPF.VM;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
-namespace SeaBattle
+namespace SeaBattleWPF
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         public MainWindow()
         {
             InitializeComponent();
+
+            // Создаём MainVM и задаём DataContext
+            var mainVM = new MainVM();
+            this.DataContext = mainVM;
+
+            // Привязываем Frame к PageControl
+            MainFrame.SetBinding(Frame.ContentProperty,
+                new System.Windows.Data.Binding("PageControl.CurrentPage")
+                {
+                    Source = mainVM
+                });
         }
     }
 }

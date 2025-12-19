@@ -1,153 +1,164 @@
-﻿using System.Windows;
+﻿using SeaBattleRepository.DTO;
+using SeaBattleWPF.API;
+using SeaBattleWPF.API.Game;
+using SeaBattleWPF.VM;
+using System;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
-using System.Collections.Generic;
 
-namespace SeaBattle.View
+namespace SeaBattleWPF.View
 {
     public partial class ShipPlacementPage : Page
     {
-        private List<Rectangle> shipPreviews = new List<Rectangle>();
+        private ShipPlacementVM _vm;
+        private bool _isGameAgainstAI;
 
-        public ShipPlacementPage()
+        public ShipPlacementPage(bool isGameAgainstAI = false)
         {
             InitializeComponent();
-            DrawGrid();
+            _isGameAgainstAI = isGameAgainstAI;
+            _vm = new ShipPlacementVM();
         }
 
-        private void DrawGrid()
+        private void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            PlacementField.Children.Clear();
-            shipPreviews.Clear();
+            _vm.RedrawField(PlacementCanvas);
+            UpdateStatus();
+        }
 
-            // Рисуем сетку
-            for (int i = 0; i <= 10; i++)
+        private void PlacementCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _vm.PlaceShip(PlacementCanvas, e);
+            UpdateStatus();
+        }
+
+        private void RotateButton_Click(object sender, RoutedEventArgs e)
+        {
+            _vm.RotateShip();
+            StatusText.Text = $"Корабль: {_vm.RotationText}";
+        }
+
+        private void RandomButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Упрощённая случайная расстановка
+            var randomField = GenerateRandomField();
+
+            // Копируем в VM
+            for (int i = 0; i < 100; i++)
             {
-                var verticalLine = new Line
+                // Здесь нужно заполнить поле VM
+            }
+
+            _vm.RedrawField(PlacementCanvas);
+            StatusText.Text = "Корабли расставлены случайно";
+            ReadyButton.IsEnabled = true;
+        }
+
+        private byte[] GenerateRandomField()
+        {
+            var field = new byte[100];
+            var random = new Random();
+
+            // Простая случайная расстановка для теста
+            for (int i = 0; i < 20; i++) // 20 случайных клеток-кораблей
+            {
+                int x = random.Next(10);
+                int y = random.Next(10);
+                int index = x + y * 10;
+                field[index] = 1;
+            }
+
+            return field;
+        }
+
+        private void ClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            _vm = new ShipPlacementVM();
+            _vm.RedrawField(PlacementCanvas);
+            UpdateStatus();
+            ReadyButton.IsEnabled = false;
+        }
+
+        private void ReadyButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_vm.AllShipsPlaced)
+            {
+                MessageBox.Show("Расставьте все корабли перед началом игры!");
+                return;
+            }
+
+            var field = _vm.GetField();
+
+            // Если игра против ИИ
+            if (_isGameAgainstAI)
+            {
+                StartGameAgainstAI(field);
+            }
+            else
+            {
+                // Для онлайн игры - отправляем поле на сервер
+                StartOnlineGame(field);
+            }
+        }
+
+        private void StartGameAgainstAI(byte[] playerField)
+        {
+            try
+            {
+                var client = TcpGameClient.Instance;
+                client.SetGameMode(GameMode.OfflineAI);
+
+                // Создаём игру
+                var game = new GameDTO
                 {
-                    X1 = i * 30,
-                    Y1 = 0,
-                    X2 = i * 30,
-                    Y2 = 300,
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 1
+                    Id = 1,
+                    Creator = new UserDTO { Id = 1, Login = "Игрок", Rating = 1000 },
+                    Opponent = new UserDTO { Id = 2, Login = "ИИ", Rating = 900 },
+                    Status = 1,
+                    IdUserNextTurn = 1,
+                    DatetimeStartGame = DateTime.Now,
+                    FieldUser1 = playerField // Сохраняем поле игрока
                 };
 
-                var horizontalLine = new Line
-                {
-                    X1 = 0,
-                    Y1 = i * 30,
-                    X2 = 300,
-                    Y2 = i * 30,
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 1
-                };
+                // Инициализируем глобальное состояние игры
+                Game.CurrentGame = game;
+                Game.CreatorIsCurrentUser = true;
+                Game.SetState(States.MyTurn);
 
-                PlacementField.Children.Add(verticalLine);
-                PlacementField.Children.Add(horizontalLine);
+                // Переходим к игровой странице
+                var gamePage = new GamePage();
+                PageControl.GetInstance().CurrentPage = gamePage;
+
+                // Регистрируем поле игрока
+                var gameVM = (GameVM)gamePage.DataContext;
+                gameVM.RegisterField(gamePage.FieldUser1, true);
+                Game.RedrawMyField(gamePage.FieldUser1, playerField);
             }
-
-            // Добавляем координаты
-            for (int i = 0; i < 10; i++)
+            catch (Exception ex)
             {
-                // Буквы сверху
-                var letterText = new TextBlock
-                {
-                    Text = ((char)('A' + i)).ToString(),
-                    FontSize = 12,
-                    Foreground = Brushes.Black,
-                    FontWeight = FontWeights.Bold
-                };
-                Canvas.SetLeft(letterText, i * 30 + 10);
-                Canvas.SetTop(letterText, -20);
-                PlacementField.Children.Add(letterText);
-
-                // Цифры слева
-                var numberText = new TextBlock
-                {
-                    Text = (i + 1).ToString(),
-                    FontSize = 12,
-                    Foreground = Brushes.Black,
-                    FontWeight = FontWeights.Bold
-                };
-                Canvas.SetLeft(numberText, -20);
-                Canvas.SetTop(numberText, i * 30 + 10);
-                PlacementField.Children.Add(numberText);
+                MessageBox.Show($"Ошибка: {ex.Message}");
             }
         }
 
-        private void Field_MouseClick(object sender, MouseButtonEventArgs e)
+        private void StartOnlineGame(byte[] playerField)
         {
-            var pos = e.GetPosition(PlacementField);
-            int x = (int)(pos.X / 30);
-            int y = (int)(pos.Y / 30);
-
-            if (x >= 0 && x < 10 && y >= 0 && y < 10)
-            {
-                var vm = (VM.ShipPlacementVM)DataContext;
-                if (vm.TryPlaceShip(x, y))
-                {
-                    DrawPlacedShips();
-                }
-            }
+            // Для онлайн игры - здесь будет отправка на сервер
+            MessageBox.Show("Онлайн игра пока не реализована");
         }
 
-        private void DrawPlacedShips()
+        private void UpdateStatus()
         {
-            // Очищаем старые корабли
-            foreach (var preview in shipPreviews)
+            if (_vm.AllShipsPlaced)
             {
-                PlacementField.Children.Remove(preview);
+                StatusText.Text = "Все корабли расставлены! Нажмите 'Готово'.";
+                ReadyButton.IsEnabled = true;
             }
-            shipPreviews.Clear();
-
-            var vm = (VM.ShipPlacementVM)DataContext;
-            var ships = vm.GetPlacedShips();
-            var field = vm.GetGameField();
-
-            // Рисуем все размещенные корабли
-            for (int i = 0; i < 10; i++)
+            else
             {
-                for (int j = 0; j < 10; j++)
-                {
-                    if (field[i, j] == 1)
-                    {
-                        var shipCell = new Rectangle
-                        {
-                            Width = 28,
-                            Height = 28,
-                            Fill = Brushes.DarkGray,
-                            Stroke = Brushes.Black,
-                            StrokeThickness = 1
-                        };
-
-                        Canvas.SetLeft(shipCell, i * 30 + 1);
-                        Canvas.SetTop(shipCell, j * 30 + 1);
-
-                        PlacementField.Children.Add(shipCell);
-                        shipPreviews.Add(shipCell);
-                    }
-                }
+                StatusText.Text = "Кликните на поле, чтобы разместить корабль";
+                ReadyButton.IsEnabled = false;
             }
-        }
-
-        private void PlacementField_MouseMove(object sender, MouseEventArgs e)
-        {
-            var pos = e.GetPosition(PlacementField);
-            int x = (int)(pos.X / 30);
-            int y = (int)(pos.Y / 30);
-
-            if (x >= 0 && x < 10 && y >= 0 && y < 10)
-            {
-                // Можно добавить предпросмотр корабля при наведении
-            }
-        }
-
-        private void ClearField_Click(object sender, RoutedEventArgs e)
-        {
-            DrawGrid();
         }
     }
 }

@@ -1,7 +1,9 @@
-﻿using SeaBattle.mvvm;
-using SeaBattle.View;
+﻿// MainVM.cs - должен быть в папке VM
+using SeaBattleWPF.mvvm;
+using SeaBattleWPF.View;
+using System.Windows;
 
-namespace SeaBattle.VM
+namespace SeaBattleWPF.VM
 {
     public class MainVM : BaseVM
     {
@@ -11,6 +13,7 @@ namespace SeaBattle.VM
         {
             PageControl = PageControl.GetInstance();
             PageControl.CurrentPage = new LoginPage();
+            Application.Current.Exit += PageControl.OnAppClose;
         }
     }
 }

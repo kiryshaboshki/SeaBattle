@@ -1,35 +1,49 @@
 ﻿using System;
 using System.Windows.Input;
 
-namespace SeaBattle.mvvm
+namespace SeaBattleWPF.mvvm
 {
     public class CommandVM : ICommand
     {
-        private readonly Action execute;
-        private readonly Func<bool> canExecute;
+        Action action;
 
-        public CommandVM(Action execute) : this(execute, null) { }
-
-        public CommandVM(Action execute, Func<bool> canExecute)
+        public CommandVM(Action action)
         {
-            this.execute = execute ?? throw new ArgumentNullException(nameof(execute));
-            this.canExecute = canExecute;
+            this.action = action;
         }
 
-        public event EventHandler CanExecuteChanged
-        {
-            add { CommandManager.RequerySuggested += value; }
-            remove { CommandManager.RequerySuggested -= value; }
-        }
+        public event EventHandler CanExecuteChanged;
 
         public bool CanExecute(object parameter)
         {
-            return canExecute?.Invoke() ?? true;
+            return true;
         }
 
         public void Execute(object parameter)
         {
-            execute();
+            action();
+        }
+    }
+
+    public class CommandVM<T> : ICommand where T : class
+    {
+        Action<T> action;
+
+        public CommandVM(Action<T> action)
+        {
+            this.action = action;
+        }
+
+        public event EventHandler CanExecuteChanged;
+
+        public bool CanExecute(object parameter)
+        {
+            return true;
+        }
+
+        public void Execute(object parameter)
+        {
+            action((T)parameter);
         }
     }
 }

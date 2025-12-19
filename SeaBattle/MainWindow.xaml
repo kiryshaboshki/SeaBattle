@@ -1,14 +1,12 @@
-﻿<Window x:Class="SeaBattle.MainWindow"
+﻿<Window x:Class="SeaBattleWPF.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="clr-namespace:SeaBattle.VM"
-        Title="Морской бой" Height="450" Width="800">
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Морской бой" Height="500" Width="850"
+        WindowStartupLocation="CenterScreen">
 
-    <Window.DataContext>
-        <vm:MainVM/>
-    </Window.DataContext>
+    <Frame x:Name="MainFrame" NavigationUIVisibility="Hidden"/>
 
-    <Frame NavigationUIVisibility="Hidden" 
-           Content="{Binding PageControl.CurrentPage}">
-    </Frame>
 </Window>

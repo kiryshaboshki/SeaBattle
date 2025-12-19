@@ -1,53 +1,43 @@
-﻿<Page x:Class="SeaBattle.View.PageListGames"
+﻿<Page x:Class="SeaBattleWPF.View.PageListGames"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:vm="clr-namespace:SeaBattle.VM"
-      Title="Список игр">
-
-    <Page.DataContext>
-        <vm:PageListGamesVM/>
-    </Page.DataContext>
-
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:SeaBattleWPF.View"
+      xmlns:vm="clr-namespace:SeaBattleWPF.VM"
+      xmlns:dto="clr-namespace:SeaBattleRepository.DTO"
+      mc:Ignorable="d" 
+      DataContext="{DynamicResource vm}"
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="PageListGames">
+    <Page.Resources>
+        <vm:PageListGamesVM x:Key="vm"/>
+        <DataTemplate DataType="{x:Type dto:GameDTO}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.2*"/>
+                    <ColumnDefinition Width="0.2*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label Content="{Binding DatetimeStartGame, StringFormat=dd.MM.yyyy}"/>
+                <Label Grid.Column="1" Content="{Binding Creator.Login}"/>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition />
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
-        <!-- Заголовок -->
-        <TextBlock Text="Список доступных игр" 
-                   FontSize="20" 
-                   HorizontalAlignment="Center"
-                   Margin="10"
-                   FontWeight="Bold"/>
-
-        <!-- Список игр -->
-        <ListBox Grid.Row="1" 
-                 Margin="20,10"
-                 ItemsSource="{Binding Games}"
-                 SelectedItem="{Binding SelectedGame}"
-                 DisplayMemberPath="DisplayText"/>
-
-        <!-- Панель кнопок -->
-        <StackPanel Grid.Row="2" 
-                    Orientation="Horizontal" 
-                    HorizontalAlignment="Center"
-                    Margin="10">
-            <Button Content="Создать игру" 
-                    Width="120"
-                    Margin="5"
-                    Command="{Binding CreateGameCommand}"/>
-
-            <Button Content="Присоединиться" 
-                    Width="120"
-                    Margin="5"
-                    Command="{Binding JoinGameCommand}"/>
-
-            <Button Content="Обновить" 
-                    Width="80"
-                    Margin="5"
-                    Command="{Binding RefreshCommand}"/>
+        <StackPanel Orientation="Horizontal">
+            <Button Content="Создать" Command="{Binding CreateGame}"/>
+            <Button Content="Присоединиться" Command="{Binding JoinGame}"/>
+            <Button Content="Обновить список игр" Command="{Binding RefreshGames}"/>
         </StackPanel>
+        <ListBox Grid.Row="1" 
+                 HorizontalContentAlignment="Stretch"
+                 ItemsSource="{Binding Games}"
+                 SelectedItem="{Binding SelectedGame}"/>
     </Grid>
 </Page>

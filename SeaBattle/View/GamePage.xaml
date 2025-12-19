@@ -1,197 +1,49 @@
-﻿<Page x:Class="SeaBattle.View.GamePage"
+﻿<Page x:Class="SeaBattleWPF.View.GamePage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:vm="clr-namespace:SeaBattle.VM"
-      xmlns:local="clr-namespace:SeaBattle.View"
-      Title="Игровая страница"
-      Loaded="Page_Loaded">
-
-    <Page.DataContext>
-        <vm:GameVM/>
-    </Page.DataContext>
-
-    <Page.Resources>
-        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        <local:ConnectionColorConverter x:Key="ConnectionColorConverter"/>
-    </Page.Resources>
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800"
+      Title="GamePage"
+      Unloaded="Page_Unloaded">
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Верхняя панель -->
-        <Border Grid.Row="0" Background="LightBlue" Padding="10" Margin="10">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Морской бой - Игра в процессе" 
-                           FontSize="18"
-                           FontWeight="Bold"
-                           VerticalAlignment="Center"/>
-
-                <TextBlock Text="{Binding GameStatus}" 
-                           FontSize="16"
-                           Foreground="Green"
-                           Margin="20,0,0,0"
-                           VerticalAlignment="Center"
-                           FontWeight="SemiBold"/>
-
-                <Button Content="Выйти из игры" 
-                        Margin="50,0,0,0"
-                        Padding="10,5"
-                        HorizontalAlignment="Right"
-                        Command="{Binding ExitCommand}"
-                        Background="#FFE74C3C"
-                        Foreground="White"
-                        FontWeight="Bold"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Панель статистики -->
-        <StackPanel Grid.Row="1" 
-                    Orientation="Horizontal" 
-                    HorizontalAlignment="Center" 
-                    Margin="10,5">
-
-            <!-- Ваши корабли -->
-            <Border Background="#2ECC71" Padding="10,8" Margin="5" Width="150">
-                <StackPanel>
-                    <TextBlock Text="ВАШИ КОРАБЛИ" 
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               Foreground="White"/>
-                    <TextBlock Text="{Binding MyShipsAlive, StringFormat='Живых: {0}'}" 
-                               HorizontalAlignment="Center"
-                               FontSize="14"
-                               Foreground="White"
-                               Margin="0,3"/>
-                    <TextBlock Text="{Binding MyShipsTotal, StringFormat='Всего: {0}'}" 
-                               HorizontalAlignment="Center"
-                               FontSize="12"
-                               Foreground="LightGray"/>
-                </StackPanel>
+        <!-- Ваше поле -->
+        <StackPanel Grid.Column="0" Margin="20">
+            <TextBlock Text="Ваше поле" FontSize="16" FontWeight="Bold" 
+                       HorizontalAlignment="Center" Margin="0,0,0,10"/>
+            <Border BorderBrush="Black" BorderThickness="1" 
+                    Width="310" Height="310" HorizontalAlignment="Center">
+                <Canvas x:Name="FieldUser1" Width="300" Height="300" 
+                        Background="LightBlue" Margin="5"/>
             </Border>
-
-            <!-- Корабли противника -->
-            <Border Background="#E74C3C" Padding="10,8" Margin="5" Width="150">
-                <StackPanel>
-                    <TextBlock Text="КОРАБЛИ ПРОТИВНИКА" 
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               Foreground="White"/>
-                    <TextBlock Text="{Binding EnemyShipsAlive, StringFormat='Живых: {0}'}" 
-                               HorizontalAlignment="Center"
-                               FontSize="14"
-                               Foreground="White"
-                               Margin="0,3"/>
-                    <TextBlock Text="{Binding EnemyShipsTotal, StringFormat='Всего: {0}'}" 
-                               HorizontalAlignment="Center"
-                               FontSize="12"
-                               Foreground="LightGray"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Информация о ходе -->
-            <Border Background="#3498DB" Padding="10,8" Margin="5" Width="200">
-                <StackPanel>
-                    <TextBlock Text="ТЕКУЩИЙ ХОД" 
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               Foreground="White"/>
-                    <TextBlock Text="{Binding CurrentPlayer}" 
-                               HorizontalAlignment="Center"
-                               FontSize="14"
-                               Foreground="White"
-                               Margin="0,3"/>
-                    <TextBlock Text="{Binding TurnInfo}" 
-                               HorizontalAlignment="Center"
-                               FontSize="12"
-                               Foreground="LightGray"/>
-                </StackPanel>
-            </Border>
-
+            <TextBlock x:Name="YourStatus" Text="Статус: ожидание..." 
+                       HorizontalAlignment="Center" Margin="0,10,0,0"/>
         </StackPanel>
 
-        <!-- Игровые поля -->
-        <Grid Grid.Row="2" Margin="20,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-                <ColumnDefinition Width="80"/>
-                <ColumnDefinition/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Ваше поле -->
-            <Border BorderBrush="#2C3E50" BorderThickness="3" Padding="15" Background="#ECF0F1">
-                <StackPanel>
-                    <TextBlock Text="ВАШЕ ПОЛЕ" 
-                               FontSize="18"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,15"
-                               Foreground="#2C3E50"/>
-
-                    <Border BorderBrush="#BDC3C7" BorderThickness="1" Padding="5" Background="White">
-                        <Canvas Width="300" Height="300" x:Name="MyField">
-                            <!-- Здесь будет отрисовываться ваше поле с кораблями -->
-                        </Canvas>
-                    </Border>
-                </StackPanel>
+        <!-- Поле противника -->
+        <StackPanel Grid.Column="1" Margin="20">
+            <TextBlock Text="Поле противника" FontSize="16" FontWeight="Bold" 
+                       HorizontalAlignment="Center" Margin="0,0,0,10"/>
+            <Border BorderBrush="Black" BorderThickness="1" 
+                    Width="310" Height="310" HorizontalAlignment="Center">
+                <Canvas x:Name="FieldUser2" Width="300" Height="300" 
+                        Background="LightBlue" Margin="5"
+                        MouseLeftButtonDown="FieldUser2_MouseLeftButtonDown"/>
             </Border>
+            <TextBlock x:Name="MessageText" HorizontalAlignment="Center" 
+                       Margin="0,10,0,0" Foreground="Red"/>
+        </StackPanel>
 
-            <!-- Разделитель -->
-            <Grid Grid.Column="1">
-                <TextBlock Text="VS" 
-                           FontSize="28"
-                           FontWeight="Black"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Foreground="#34495E"/>
-            </Grid>
-
-            <!-- Поле противника -->
-            <Border Grid.Column="2" BorderBrush="#2C3E50" BorderThickness="3" Padding="15" Background="#ECF0F1">
-                <StackPanel>
-                    <TextBlock Text="ПОЛЕ ПРОТИВНИКА" 
-                               FontSize="18"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,15"
-                               Foreground="#2C3E50"/>
-
-                    <Border BorderBrush="#BDC3C7" BorderThickness="1" Padding="5" Background="White">
-                        <Canvas Width="300" 
-                                Height="300" 
-                                x:Name="EnemyField"
-                                MouseLeftButtonDown="EnemyField_MouseLeftButtonDown"
-                                Cursor="Hand">
-                            <!-- Здесь будет отрисовываться поле противника -->
-                        </Canvas>
-                    </Border>
-                </StackPanel>
-            </Border>
-        </Grid>
-
-        <!-- Панель лога игры -->
-        <Border Grid.Row="3" Grid.ColumnSpan="3" Background="#2C3E50" Margin="20,10,20,20" Padding="10">
-            <StackPanel>
-                <TextBlock Text="ХОДЫ ИГРЫ" 
-                           FontSize="14"
-                           FontWeight="Bold"
-                           Foreground="White"
-                           Margin="0,0,0,5"/>
-
-                <Border Background="#34495E" Padding="10" Height="80">
-                    <ScrollViewer x:Name="GameLogScroll" VerticalScrollBarVisibility="Auto">
-                        <TextBlock x:Name="GameLog" 
-                                   Foreground="White"
-                                   TextWrapping="Wrap">
-                            • Игра началась. Ожидание хода...
-                        </TextBlock>
-                    </ScrollViewer>
-                </Border>
-            </StackPanel>
-        </Border>
+        <!-- Кнопка возврата -->
+        <Button Content="Вернуться в меню" HorizontalAlignment="Left" 
+                VerticalAlignment="Top" Margin="10" Padding="10,5"
+                Click="BackButton_Click"/>
     </Grid>
 </Page>

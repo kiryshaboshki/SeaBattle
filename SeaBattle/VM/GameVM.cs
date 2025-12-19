@@ -1,762 +1,452 @@
-﻿using SeaBattle.mvvm;
-using SeaBattle.View;
+﻿using SeaBattleRepository.DTO;
+using SeaBattleWPF.API;
+using SeaBattleWPF.API.Game;
+using SeaBattleWPF.mvvm;
 using System;
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using System.Linq;
-using System.Collections.Generic;
-using SeaBattle; // ДОБАВИТЬ ЭТОТ USING
 
-namespace SeaBattle.VM
+namespace SeaBattleWPF.VM
 {
     public class GameVM : BaseVM
     {
-        private string gameStatus = "Подключение к серверу...";
-        public string GameStatus
-        {
-            get => gameStatus;
-            set { gameStatus = value; Signal(); }
-        }
+        private string _message;
+        private TcpGameClient _client;
+        private Dispatcher _dispatcher;
+        private byte[] _playerField;
+        private byte[] _opponentField = new byte[100]; // Поле противника (для отслеживания выстрелов)
+        private Random _random = new Random();
 
-        private string currentPlayer = "Ожидание сервера";
-        public string CurrentPlayer
+        public string Message
         {
-            get => currentPlayer;
-            set { currentPlayer = value; Signal(); }
-        }
-
-        private string turnInfo = "Инициализация игры...";
-        public string TurnInfo
-        {
-            get => turnInfo;
-            set { turnInfo = value; Signal(); }
-        }
-
-        private int myShipsAlive = 10;
-        public int MyShipsAlive
-        {
-            get => myShipsAlive;
-            set { myShipsAlive = value; Signal(); }
-        }
-
-        private int enemyShipsAlive = 10;
-        public int EnemyShipsAlive
-        {
-            get => enemyShipsAlive;
-            set { enemyShipsAlive = value; Signal(); }
-        }
-
-        private int myShipsTotal = 10;
-        public int MyShipsTotal
-        {
-            get => myShipsTotal;
-            set { myShipsTotal = value; Signal(); }
-        }
-
-        private int enemyShipsTotal = 10;
-        public int EnemyShipsTotal
-        {
-            get => enemyShipsTotal;
-            set { enemyShipsTotal = value; Signal(); }
-        }
-
-        private bool isMyTurn = false;
-        public bool IsMyTurn
-        {
-            get => isMyTurn;
+            get => _message;
             set
             {
-                isMyTurn = value;
+                _message = value;
                 Signal();
-                UpdateTurnInfo();
             }
         }
-
-        private bool isConnected = false;
-        public bool IsConnected
-        {
-            get => isConnected;
-            set { isConnected = value; Signal(); }
-        }
-
-        private bool isLoading = false;
-        public bool IsLoading
-        {
-            get => isLoading;
-            set { isLoading = value; Signal(); }
-        }
-
-        private string connectionStatus = "⏳ Подключение...";
-        public string ConnectionStatus
-        {
-            get => connectionStatus;
-            set { connectionStatus = value; Signal(); }
-        }
-
-        private ObservableCollection<string> gameLog = new ObservableCollection<string>();
-        public ObservableCollection<string> GameLog
-        {
-            get => gameLog;
-            set { gameLog = value; Signal(); }
-        }
-
-        private Canvas myField;
-        private Canvas enemyField;
-        private DispatcherTimer updateTimer;
-        private Random random = new Random();
-        private List<Ship> myShips = new List<Ship>();
-        private List<Ship> enemyShips = new List<Ship>();
-
-        public CommandVM ExitCommand { get; set; }
-        public CommandVM SurrenderCommand { get; set; }
-        public CommandVM RefreshCommand { get; set; }
 
         public GameVM()
         {
-            // ПРОВЕРЯЕМ РЕЖИМ ИГРЫ В КОНСТРУКТОРЕ
-            if (CurrentGame.IsOnline) // ТЕПЕРЬ ИСПОЛЬЗУЕТСЯ ИЗ SeaBattle
+            _client = TcpGameClient.Instance;
+            _playerField = new byte[100];
+
+            // Подписываемся на события
+            _client.OnTurnReceived += HandleTurnReceived;
+            _client.OnGameUpdate += HandleGameUpdate;
+            _client.OnError += HandleError;
+
+            InitializeGameState();
+        }
+
+        private void InitializeGameState()
+        {
+            if (Game.CurrentGame == null)
             {
-                GameStatus = "Подключение к серверу...";
-                ConnectionStatus = "🌐 Онлайн";
+                Game.CurrentGame = new GameDTO
+                {
+                    Id = 1,
+                    Creator = new UserDTO { Id = 1, Login = "Игрок", Rating = 1000 },
+                    Opponent = new UserDTO { Id = 2, Login = "Противник", Rating = 900 },
+                    Status = 1,
+                    IdUserNextTurn = 1,
+                    DatetimeStartGame = DateTime.Now
+                };
+            }
+
+            if (Game.CreatorIsCurrentUser)
+            {
+                Game.SetState(States.WaitJoin);
+                Message = "Ожидаем присоединения противника...";
             }
             else
             {
-                GameStatus = "Оффлайн игра против компьютера";
-                ConnectionStatus = "📴 Оффлайн";
-                IsMyTurn = true;
-            }
-
-            ExitCommand = new CommandVM(() =>
-            {
-                var result = MessageBox.Show("Вы уверены, что хотите выйти из игры?",
-                    "Подтверждение выхода", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    StopUpdateTimer();
-                    var pageControl = PageControl.GetInstance();
-                    pageControl.CurrentPage = new PageListGames();
-                }
-            });
-
-            SurrenderCommand = new CommandVM(() =>
-            {
-                var result = MessageBox.Show("Вы уверены, что хотите сдаться?",
-                    "Подтверждение сдачи", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    AddToLog("Вы сдались. Поражение!");
-                    MessageBox.Show("Вы сдались. Поражение!", "Сдача",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    StopUpdateTimer();
-                    var pageControl = PageControl.GetInstance();
-                    pageControl.CurrentPage = new PageListGames();
-                }
-            });
-
-            RefreshCommand = new CommandVM(() =>
-            {
-                if (!CurrentGame.IsOnline)
-                {
-                    ConnectionStatus = "📴 Оффлайн";
-                    MessageBox.Show("Работаем в оффлайн-режиме", "Информация",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            });
-
-            InitializeGame();
-
-            if (CurrentGame.IsOnline)
-            {
-                StartUpdateTimer();
+                Game.SetState(States.WaitTurn);
+                Message = "Ожидаем ход противника...";
             }
         }
 
-        // ДОБАВИТЬ ЭТОТ МЕТОД (для кнопки в GamePage.xaml.cs)
-        public void SimulateEnemyTurn()
+        private void HandleTurnReceived(GameTurn turn)
         {
-            AddToLog("Тестовый ход противника выполнен (функция для отладки)");
-        }
-
-        private void InitializeGame()
-        {
-            MyShipsTotal = 10;
-            EnemyShipsTotal = 10;
-            MyShipsAlive = 10;
-            EnemyShipsAlive = 10;
-
-            if (!CurrentGame.IsOnline)
+            _dispatcher?.Invoke(() =>
             {
-                GenerateEnemyShips();
-            }
-
-            GameLog.Clear();
-            AddToLog("Игра инициализирована");
-            AddToLog(CurrentGame.IsOnline ?
-                $"Игра #{CurrentGame.Id} против {CurrentGame.OpponentName}" :
-                "Оффлайн игра с компьютером");
-
-            UpdateTurnInfo();
-        }
-
-        private void GenerateEnemyShips()
-        {
-            enemyShips.Clear();
-            var field = new int[10, 10];
-            var shipSizes = new[] { 4, 3, 3, 2, 2, 2, 1, 1, 1, 1 };
-
-            foreach (var size in shipSizes)
-            {
-                bool placed = false;
-                int attempts = 0;
-
-                while (!placed && attempts < 100)
+                if (turn.FieldUser != null && turn.FieldUser.Length == 100)
                 {
-                    int x = random.Next(0, 10);
-                    int y = random.Next(0, 10);
-                    bool horizontal = random.Next(0, 2) == 0;
+                    _playerField = turn.FieldUser;
 
-                    if (CanPlaceShip(field, x, y, size, horizontal))
+                    if (_fieldUser1Canvas != null)
                     {
-                        var ship = new Ship
-                        {
-                            Size = size,
-                            IsHorizontal = horizontal,
-                            X = x,
-                            Y = y,
-                            Cells = new List<(int, int)>()
-                        };
-
-                        for (int i = 0; i < size; i++)
-                        {
-                            int cellX = horizontal ? x + i : x;
-                            int cellY = horizontal ? y : y + i;
-                            field[cellX, cellY] = size;
-                            ship.Cells.Add((cellX, cellY));
-                        }
-
-                        enemyShips.Add(ship);
-                        placed = true;
-                    }
-                    attempts++;
-                }
-            }
-        }
-
-        private bool CanPlaceShip(int[,] field, int x, int y, int size, bool horizontal)
-        {
-            if (horizontal)
-            {
-                if (x + size > 10) return false;
-                for (int i = 0; i < size; i++)
-                {
-                    if (!IsCellAvailable(field, x + i, y)) return false;
-                }
-            }
-            else
-            {
-                if (y + size > 10) return false;
-                for (int i = 0; i < size; i++)
-                {
-                    if (!IsCellAvailable(field, x, y + i)) return false;
-                }
-            }
-            return true;
-        }
-
-        private bool IsCellAvailable(int[,] field, int x, int y)
-        {
-            for (int dx = -1; dx <= 1; dx++)
-            {
-                for (int dy = -1; dy <= 1; dy++)
-                {
-                    int nx = x + dx;
-                    int ny = y + dy;
-
-                    if (nx >= 0 && nx < 10 && ny >= 0 && ny < 10)
-                    {
-                        if (field[nx, ny] != 0) return false;
+                        Game.RedrawMyField(_fieldUser1Canvas, _playerField);
                     }
                 }
-            }
-            return true;
-        }
 
-        private void UpdateTurnInfo()
-        {
-            if (IsMyTurn)
-            {
-                CurrentPlayer = "ВАШ ХОД";
-                TurnInfo = "Кликайте по полю противника для выстрела";
-                GameStatus = "Ваша очередь стрелять";
-            }
-            else
-            {
-                CurrentPlayer = "ХОД ПРОТИВНИКА";
-                TurnInfo = CurrentGame.IsOnline ?
-                    "Ожидание хода противника..." :
-                    "Компьютер думает...";
-                GameStatus = CurrentGame.IsOnline ?
-                    "Противник делает ход" :
-                    "Ход компьютера";
-            }
-        }
+                Game.TestTurn(turn);
 
-        public void InitializeFields(Canvas myFieldCanvas, Canvas enemyFieldCanvas)
-        {
-            myField = myFieldCanvas;
-            enemyField = enemyFieldCanvas;
-
-            DrawGrid(myField);
-            DrawGrid(enemyField);
-            DrawShipsOnMyField();
-
-            AddToLog("Поля инициализированы");
-
-            if (!CurrentGame.IsOnline)
-            {
-                IsMyTurn = true;
-                AddToLog("Оффлайн игра началась! Ваш ход.");
-            }
-        }
-
-        private void DrawShipsOnMyField()
-        {
-            if (myField == null) return;
-
-            var childrenToRemove = new List<UIElement>();
-            foreach (UIElement child in myField.Children)
-            {
-                if (child is Rectangle)
+                if (turn.IdWinner > 0)
                 {
-                    childrenToRemove.Add(child);
-                }
-            }
-            foreach (var child in childrenToRemove)
-            {
-                myField.Children.Remove(child);
-            }
+                    bool isWinner = turn.IdWinner == Game.CurrentGame?.Creator?.Id;
+                    string message = isWinner ?
+                        "🎉 Поздравляем! Вы победили!" :
+                        "😔 Вы проиграли. Попробуйте снова!";
 
-            DrawTestShips();
-        }
-
-        private void DrawTestShips()
-        {
-            DrawShip(1, 1, 4, true, Brushes.DarkGray, myField);
-            DrawShip(6, 1, 3, false, Brushes.DarkGray, myField);
-            DrawShip(1, 6, 3, true, Brushes.DarkGray, myField);
-            DrawShip(8, 3, 2, false, Brushes.DarkGray, myField);
-            DrawShip(4, 8, 2, true, Brushes.DarkGray, myField);
-            DrawShip(0, 0, 2, false, Brushes.DarkGray, myField);
-            DrawSingleShip(9, 9, Brushes.DarkGray, myField);
-            DrawSingleShip(5, 5, Brushes.DarkGray, myField);
-            DrawSingleShip(2, 9, Brushes.DarkGray, myField);
-            DrawSingleShip(9, 2, Brushes.DarkGray, myField);
-        }
-
-        private void DrawGrid(Canvas canvas)
-        {
-            canvas.Children.Clear();
-
-            for (int i = 0; i <= 10; i++)
-            {
-                var verticalLine = new Line
-                {
-                    X1 = i * 30,
-                    Y1 = 0,
-                    X2 = i * 30,
-                    Y2 = 300,
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 1
-                };
-                canvas.Children.Add(verticalLine);
-
-                var horizontalLine = new Line
-                {
-                    X1 = 0,
-                    Y1 = i * 30,
-                    X2 = 300,
-                    Y2 = i * 30,
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 1
-                };
-                canvas.Children.Add(horizontalLine);
-            }
-
-            for (int i = 0; i < 10; i++)
-            {
-                var letterText = new TextBlock
-                {
-                    Text = ((char)('A' + i)).ToString(),
-                    FontSize = 12,
-                    Foreground = Brushes.Black,
-                    FontWeight = FontWeights.Bold
-                };
-                Canvas.SetLeft(letterText, i * 30 + 10);
-                Canvas.SetTop(letterText, -20);
-                canvas.Children.Add(letterText);
-
-                var numberText = new TextBlock
-                {
-                    Text = (i + 1).ToString(),
-                    FontSize = 12,
-                    Foreground = Brushes.Black,
-                    FontWeight = FontWeights.Bold
-                };
-                Canvas.SetLeft(numberText, -20);
-                Canvas.SetTop(numberText, i * 30 + 10);
-                canvas.Children.Add(numberText);
-            }
-        }
-
-        private void DrawShip(int x, int y, int size, bool horizontal, Brush color, Canvas canvas)
-        {
-            for (int i = 0; i < size; i++)
-            {
-                var shipCell = new Rectangle
-                {
-                    Width = 28,
-                    Height = 28,
-                    Fill = color,
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 1
-                };
-
-                if (horizontal)
-                {
-                    Canvas.SetLeft(shipCell, (x + i) * 30 + 1);
-                    Canvas.SetTop(shipCell, y * 30 + 1);
+                    MessageBox.Show(message, "Игра окончена",
+                                  MessageBoxButton.OK,
+                                  isWinner ? MessageBoxImage.Information : MessageBoxImage.Exclamation);
                 }
                 else
                 {
-                    Canvas.SetLeft(shipCell, x * 30 + 1);
-                    Canvas.SetTop(shipCell, (y + i) * 30 + 1);
+                    if (turn.IdUserNextTurn == Game.CurrentGame?.Creator?.Id)
+                    {
+                        Message = "Ваш ход!";
+                        Game.SetState(States.MyTurn);
+                    }
+                    else
+                    {
+                        Message = "Ход противника...";
+                        Game.SetState(States.WaitTurn);
+                    }
+                }
+            });
+        }
+
+        private void HandleGameUpdate(GameDTO game)
+        {
+            _dispatcher?.Invoke(() =>
+            {
+                Game.CurrentGame = game;
+
+                if (game.Status == 0)
+                {
+                    Message = "Ожидаем второго игрока...";
+                    Game.SetState(States.WaitJoin);
+                }
+                else if (game.Status == 1)
+                {
+                    if (game.IdUserNextTurn == Game.CurrentGame?.Creator?.Id)
+                    {
+                        Message = "Ваш ход!";
+                        Game.SetState(States.MyTurn);
+                    }
+                    else
+                    {
+                        Message = "Ход противника...";
+                        Game.SetState(States.WaitTurn);
+                    }
+                }
+                else if (game.Status == 2)
+                {
+                    Message = "Игра завершена";
                 }
 
-                canvas.Children.Add(shipCell);
+                Signal(nameof(Message));
+            });
+        }
+
+        private void HandleError(string error)
+        {
+            _dispatcher?.Invoke(() =>
+            {
+                MessageBox.Show(error, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                Message = $"Ошибка: {error}";
+            });
+        }
+
+        internal void ClickField(Canvas fieldUser, MouseButtonEventArgs e)
+        {
+            if (fieldUser == _fieldUser2Canvas &&
+                Game.CurrentGame?.IdUserNextTurn == Game.CurrentGame?.Creator?.Id)
+            {
+                var position = e.GetPosition(fieldUser);
+                int x = (int)Math.Round(position.X) / 30;
+                int y = (int)Math.Round(position.Y) / 30;
+
+                if (x >= 0 && x < 10 && y >= 0 && y < 10)
+                {
+                    // Исправленная проверка
+                    if (!IsCellAlreadyShot(x, y))
+                    {
+                        MakeTurn(x, y);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Вы уже стреляли в эту клетку!",
+                                      "Повторный выстрел",
+                                      MessageBoxButton.OK,
+                                      MessageBoxImage.Warning);
+                    }
+                }
+            }
+            else if (fieldUser == _fieldUser2Canvas)
+            {
+                MessageBox.Show("Сейчас не ваш ход!",
+                              "Ожидайте",
+                              MessageBoxButton.OK,
+                              MessageBoxImage.Information);
             }
         }
 
-        private void DrawSingleShip(int x, int y, Brush color, Canvas canvas)
+        // НОВЫЙ МЕТОД: Проверка, стреляли ли уже в клетку
+        private bool IsCellAlreadyShot(int x, int y)
         {
-            var shipCell = new Rectangle
-            {
-                Width = 28,
-                Height = 28,
-                Fill = color,
-                Stroke = Brushes.Black,
-                StrokeThickness = 1
-            };
-
-            Canvas.SetLeft(shipCell, x * 30 + 1);
-            Canvas.SetTop(shipCell, y * 30 + 1);
-            canvas.Children.Add(shipCell);
+            int index = x + y * 10;
+            // Проверяем по массиву opponentField
+            // 0 = неизвестно, 2 = попадание, 3 = промах
+            return _opponentField[index] == 2 || _opponentField[index] == 3;
         }
 
-        public async Task ProcessShot(int x, int y, bool isMyShot)
+        private async void MakeTurn(int x, int y)
         {
-            if (!IsMyTurn && isMyShot)
+            if (Game.CurrentGame == null)
             {
-                MessageBox.Show("Сейчас не ваш ход! Ожидайте хода противника.",
-                    "Не ваш ход", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Игра не инициализирована", "Ошибка",
+                              MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            string cellName = $"{(char)('A' + x)}{y + 1}";
+            int index = x + y * 10;
 
-            if (isMyShot)
+            // Сразу отмечаем в массиве, что стреляли (ожидаем результат)
+            _opponentField[index] = 4; // 4 = ожидание результата
+
+            // Отображаем выстрел (серый кружок - ожидание)
+            DrawShotMarker(_fieldUser2Canvas, x, y, Brushes.Gray);
+
+            // Отправляем ход
+            await _client.SendAsync("MAKE_TURN", new
             {
-                AddToLog($"Ваш выстрел в {cellName}...");
+                GameId = Game.CurrentGame.Id,
+                X = x,
+                Y = y
+            });
 
-                if (!CurrentGame.IsOnline)
-                {
-                    await ProcessOfflineShot(x, y, cellName);
-                }
-                else
-                {
-                    await ProcessOnlineShot(x, y, cellName);
-                }
-
-                CheckGameEnd();
-            }
+            Message = "Ожидаем результат выстрела...";
         }
 
-        private async Task ProcessOnlineShot(int x, int y, string cellName)
+        private void DrawShotMarker(Canvas canvas, int x, int y, Brush color)
         {
-            await Task.Delay(300);
+            // Очищаем старые маркеры в этой клетке
+            ClearCellMarkers(canvas, x, y);
 
-            bool isHit = random.Next(0, 2) == 0;
-            bool isDestroyed = isHit && random.Next(0, 3) == 0;
-
-            if (isHit)
-            {
-                DrawHitMarker(x, y, Brushes.DarkRed, enemyField);
-                EnemyShipsAlive--;
-
-                if (isDestroyed)
-                {
-                    AddToLog($"✓ УНИЧТОЖЕН корабль в {cellName}!");
-                    MessageBox.Show($"УНИЧТОЖЕН корабль! {cellName}", "Уничтожение",
-                        MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                }
-                else
-                {
-                    AddToLog($"✓ ПОПАДАНИЕ в {cellName}!");
-                    MessageBox.Show($"ПОПАДАНИЕ! {cellName}", "Попадание",
-                        MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                }
-
-                IsMyTurn = true;
-                AddToLog("Дополнительный ход за попадание!");
-            }
-            else
-            {
-                DrawMissMarker(x, y, Brushes.Blue, enemyField);
-                AddToLog($"✗ Промах в {cellName}");
-                MessageBox.Show($"Промах! {cellName}", "Промах",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                IsMyTurn = false;
-            }
-        }
-
-        private async Task ProcessOfflineShot(int x, int y, string cellName)
-        {
-            await Task.Delay(300);
-
-            bool isHit = false;
-            Ship hitShip = null;
-
-            foreach (var ship in enemyShips)
-            {
-                if (ship.Cells.Contains((x, y)) && !ship.HitCells.Contains((x, y)))
-                {
-                    isHit = true;
-                    hitShip = ship;
-                    ship.HitCells.Add((x, y));
-                    break;
-                }
-            }
-
-            if (isHit)
-            {
-                DrawHitMarker(x, y, Brushes.DarkRed, enemyField);
-
-                bool isDestroyed = hitShip.IsDestroyed;
-
-                if (isDestroyed)
-                {
-                    EnemyShipsAlive--;
-                    AddToLog($"✓ УНИЧТОЖЕН {hitShip.Size}-палубный корабль в {cellName}!");
-                    MessageBox.Show($"УНИЧТОЖЕН корабль! {cellName}\nОсталось кораблей противника: {EnemyShipsAlive}",
-                        "Уничтожение", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                }
-                else
-                {
-                    AddToLog($"✓ ПОПАДАНИЕ в {cellName}!");
-                    MessageBox.Show($"ПОПАДАНИЕ! {cellName}", "Попадание",
-                        MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                }
-
-                IsMyTurn = true;
-                if (!isDestroyed)
-                {
-                    AddToLog("Дополнительный ход за попадание!");
-                }
-            }
-            else
-            {
-                DrawMissMarker(x, y, Brushes.Blue, enemyField);
-                AddToLog($"✗ Промах в {cellName}");
-                MessageBox.Show($"Промах! {cellName}", "Промах",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                IsMyTurn = false;
-
-                if (!IsMyTurn)
-                {
-                    await Task.Delay(800);
-                    await ComputerTurn();
-                }
-            }
-        }
-
-        private async Task ComputerTurn()
-        {
-            if (!IsMyTurn)
-            {
-                AddToLog("Компьютер делает ход...");
-
-                await Task.Delay(800);
-
-                int x, y;
-                string cellName;
-                bool validShot = false;
-                int attempts = 0;
-
-                do
-                {
-                    x = random.Next(0, 10);
-                    y = random.Next(0, 10);
-                    cellName = $"{(char)('A' + x)}{y + 1}";
-
-                    validShot = true;
-                    foreach (UIElement child in myField.Children)
-                    {
-                        if (child is Ellipse ellipse)
-                        {
-                            double left = Canvas.GetLeft(ellipse);
-                            double top = Canvas.GetTop(ellipse);
-                            int shotX = (int)((left - 3) / 30);
-                            int shotY = (int)((top - 3) / 30);
-
-                            if (shotX == x && shotY == y)
-                            {
-                                validShot = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    attempts++;
-                    if (attempts > 50) break;
-
-                } while (!validShot);
-
-                bool isHit = random.Next(0, 2) == 0;
-
-                if (isHit)
-                {
-                    DrawHitMarker(x, y, Brushes.DarkOrange, myField);
-                    MyShipsAlive--;
-                    AddToLog($"☠ Компьютер попал в {cellName}! Осталось кораблей: {MyShipsAlive}");
-                    MessageBox.Show($"Компьютер попал в {cellName}!\nВаших кораблей осталось: {MyShipsAlive}",
-                        "Попадание компьютера", MessageBoxButton.OK, MessageBoxImage.Warning);
-
-                    await Task.Delay(800);
-                    await ComputerTurn();
-                }
-                else
-                {
-                    DrawMissMarker(x, y, Brushes.LightBlue, myField);
-                    AddToLog($"◯ Компьютер промахнулся в {cellName}");
-                    IsMyTurn = true;
-                    AddToLog("Ваш ход!");
-                }
-
-                CheckGameEnd();
-            }
-        }
-
-        private void DrawHitMarker(int x, int y, Brush color, Canvas canvas)
-        {
-            var hitMarker = new Ellipse
-            {
-                Width = 24,
-                Height = 24,
-                Fill = color,
-                Stroke = Brushes.Black,
-                StrokeThickness = 2
-            };
-
-            Canvas.SetLeft(hitMarker, x * 30 + 3);
-            Canvas.SetTop(hitMarker, y * 30 + 3);
-            canvas.Children.Add(hitMarker);
-        }
-
-        private void DrawMissMarker(int x, int y, Brush color, Canvas canvas)
-        {
-            var missMarker = new Ellipse
+            // Рисуем новый маркер
+            Ellipse marker = new Ellipse
             {
                 Width = 20,
                 Height = 20,
                 Fill = color,
                 Stroke = Brushes.Black,
-                StrokeThickness = 1,
-                Opacity = 0.7
+                StrokeThickness = 1
             };
 
-            Canvas.SetLeft(missMarker, x * 30 + 5);
-            Canvas.SetTop(missMarker, y * 30 + 5);
-            canvas.Children.Add(missMarker);
+            Canvas.SetLeft(marker, x * 30 + 5);
+            Canvas.SetTop(marker, y * 30 + 5);
+            canvas.Children.Add(marker);
         }
 
-        private void CheckGameEnd()
+        private void ClearCellMarkers(Canvas canvas, int x, int y)
         {
-            if (EnemyShipsAlive <= 0)
+            // Удаляем все элементы в этой клетке
+            List<UIElement> toRemove = new List<UIElement>();
+
+            foreach (var child in canvas.Children)
             {
-                AddToLog("★★★★★ ПОБЕДА! Все корабли противника уничтожены! ★★★★★");
-                MessageBox.Show("ПОБЕДА! 🏆\nВы уничтожили все корабли противника!",
-                    "Победа", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                GameStatus = "Игра завершена - ВЫ ПОБЕДИЛИ! 🎉";
-                IsMyTurn = false;
-                StopUpdateTimer();
+                if (child is Shape shape)
+                {
+                    var left = Canvas.GetLeft(shape);
+                    var top = Canvas.GetTop(shape);
+
+                    int cellX = (int)(left / 30);
+                    int cellY = (int)(top / 30);
+
+                    if (cellX == x && cellY == y)
+                    {
+                        toRemove.Add(shape);
+                    }
+                }
             }
-            else if (MyShipsAlive <= 0)
+
+            foreach (var element in toRemove)
             {
-                AddToLog("☠☠☠ ПОРАЖЕНИЕ! Все ваши корабли уничтожены ☠☠☠");
-                MessageBox.Show("ПОРАЖЕНИЕ! ☠\nВсе ваши корабли уничтожены.",
-                    "Поражение", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                GameStatus = "Игра завершена - ВЫ ПРОИГРАЛИ";
-                IsMyTurn = false;
-                StopUpdateTimer();
+                canvas.Children.Remove(element);
             }
         }
 
-        private void AddToLog(string message)
+        private Canvas _fieldUser1Canvas;
+        private Canvas _fieldUser2Canvas;
+
+        internal void RegisterField(Canvas fieldUser, bool currentUser)
         {
-            string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            Application.Current.Dispatcher.Invoke(() =>
+            if (currentUser)
             {
-                GameLog.Add($"[{timestamp}] {message}");
-                if (GameLog.Count > 20) GameLog.RemoveAt(0);
+                _fieldUser1Canvas = fieldUser;
+                if (_playerField != null && _playerField.Length == 100)
+                {
+                    Game.RedrawMyField(_fieldUser1Canvas, _playerField);
+                }
+            }
+            else
+            {
+                _fieldUser2Canvas = fieldUser;
+            }
+
+            Game.RegisterField(fieldUser, currentUser);
+        }
+
+        public void SetPlayerField(byte[] field)
+        {
+            if (field != null && field.Length == 100)
+            {
+                _playerField = field;
+
+                if (Game.CurrentGame != null)
+                {
+                    Game.CurrentGame.FieldUser1 = field;
+                }
+
+                if (_fieldUser1Canvas != null)
+                {
+                    Game.RedrawMyField(_fieldUser1Canvas, _playerField);
+                }
+            }
+        }
+
+        // Старый метод (оставляем для совместимости)
+        public byte[] GenerateRandomField()
+        {
+            return GenerateValidField();
+        }
+
+        // Новый правильный метод
+        public byte[] GenerateValidField()
+        {
+            var field = new byte[100];
+
+            // Список кораблей для расстановки
+            var ships = new List<(int size, int count)>
+            {
+                (4, 1),  // 1 корабль на 4 клетки
+                (3, 2),  // 2 корабля на 3 клетки
+                (2, 3),  // 3 корабля на 2 клетки
+                (1, 4)   // 4 корабля на 1 клетку
+            };
+
+            foreach (var (size, count) in ships)
+            {
+                for (int shipNum = 0; shipNum < count; shipNum++)
+                {
+                    bool placed = false;
+                    int attempts = 0;
+
+                    while (!placed && attempts < 1000)
+                    {
+                        attempts++;
+
+                        int x = _random.Next(10);
+                        int y = _random.Next(10);
+                        bool horizontal = _random.Next(2) == 0;
+
+                        if (CanPlaceShip(field, x, y, size, horizontal))
+                        {
+                            PlaceShip(field, x, y, size, horizontal);
+                            placed = true;
+                        }
+                    }
+
+                    if (!placed)
+                    {
+                        // Начинаем заново
+                        return GenerateValidField();
+                    }
+                }
+            }
+
+            return field;
+        }
+
+        private bool CanPlaceShip(byte[] field, int x, int y, int size, bool horizontal)
+        {
+            for (int i = 0; i < size; i++)
+            {
+                int posX = horizontal ? x + i : x;
+                int posY = horizontal ? y : y + i;
+
+                if (posX >= 10 || posY >= 10)
+                    return false;
+
+                int index = posX + posY * 10;
+
+                if (field[index] != 0)
+                    return false;
+
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        int nx = posX + dx;
+                        int ny = posY + dy;
+
+                        if (nx >= 0 && nx < 10 && ny >= 0 && ny < 10)
+                        {
+                            if (field[nx + ny * 10] != 0)
+                                return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private void PlaceShip(byte[] field, int x, int y, int size, bool horizontal)
+        {
+            for (int i = 0; i < size; i++)
+            {
+                int posX = horizontal ? x + i : x;
+                int posY = horizontal ? y : y + i;
+                int index = posX + posY * 10;
+                field[index] = 1;
+            }
+        }
+
+        internal void RegisterDispatcher(Dispatcher dispatcher)
+        {
+            this._dispatcher = dispatcher;
+        }
+
+        public async Task SendReadyAsync(byte[] field)
+        {
+            if (Game.CurrentGame == null) return;
+
+            SetPlayerField(field);
+
+            await _client.SendAsync("READY_TO_PLAY", new
+            {
+                GameId = Game.CurrentGame.Id,
+                Field = field
             });
         }
 
-        private void StartUpdateTimer()
+        public void Dispose()
         {
-            if (CurrentGame.IsOnline)
+            try
             {
-                updateTimer = new DispatcherTimer();
-                updateTimer.Interval = TimeSpan.FromSeconds(5);
-                updateTimer.Tick += async (s, e) => await CheckForServerUpdates();
-                updateTimer.Start();
+                if (_client != null)
+                {
+                    _client.OnTurnReceived -= HandleTurnReceived;
+                    _client.OnGameUpdate -= HandleGameUpdate;
+                    _client.OnError -= HandleError;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error disposing GameVM: {ex.Message}");
             }
         }
-
-        private void StopUpdateTimer()
-        {
-            if (updateTimer != null)
-            {
-                updateTimer.Stop();
-                updateTimer = null;
-            }
-        }
-
-        private async Task CheckForServerUpdates()
-        {
-            if (!CurrentGame.IsOnline) return;
-            await Task.Delay(100);
-        }
     }
-
-    // Внутренний класс для кораблей (оставить)
-    public class Ship
-    {
-        public int Size { get; set; }
-        public bool IsHorizontal { get; set; }
-        public int X { get; set; }
-        public int Y { get; set; }
-        public List<(int, int)> Cells { get; set; } = new List<(int, int)>();
-        public List<(int, int)> HitCells { get; set; } = new List<(int, int)>();
-
-        public bool IsDestroyed => HitCells.Count == Size;
-    }
-
-
 }

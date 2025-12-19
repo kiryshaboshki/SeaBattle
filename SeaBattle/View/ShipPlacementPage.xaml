@@ -1,12 +1,12 @@
-﻿<Page x:Class="SeaBattle.View.ShipPlacementPage"
+﻿<Page x:Class="SeaBattleWPF.View.ShipPlacementPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:vm="clr-namespace:SeaBattle.VM"
-      Title="Расстановка кораблей">
-
-    <Page.DataContext>
-        <vm:ShipPlacementVM/>
-    </Page.DataContext>
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      mc:Ignorable="d" 
+      d:DesignHeight="500" d:DesignWidth="800"
+      Title="Расстановка кораблей"
+      Loaded="Page_Loaded">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -15,51 +15,48 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Инструкция -->
-        <Border Background="LightYellow" Padding="10" Margin="10">
+        <!-- Заголовок -->
+        <TextBlock Grid.Row="0" Text="Расстановка кораблей" 
+                   FontSize="24" FontWeight="Bold" 
+                   HorizontalAlignment="Center" Margin="0,20,0,20"/>
+
+        <!-- Игровое поле -->
+        <Border Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center">
             <StackPanel>
-                <TextBlock Text="Расставьте ваши корабли:" 
-                           FontSize="18" FontWeight="Bold"/>
-                <TextBlock Text="Корабли: 1x4, 2x3, 3x2, 4x1. Не должны соприкасаться!"
-                           Margin="0,5,0,0"/>
-                <TextBlock Text="Выберите корабль и кликните на поле для размещения"
-                           Foreground="Gray"/>
-                <TextBlock Text="{Binding StatusMessage}" 
-                           FontWeight="Bold"
-                           Margin="0,10,0,0"
-                           Foreground="DarkBlue"/>
+                <TextBlock Text="Ваше поле" FontSize="16" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+                <Border BorderBrush="Black" BorderThickness="2" 
+                        Background="White" Padding="5">
+                    <Canvas x:Name="PlacementCanvas" Width="300" Height="300" 
+                            Background="LightBlue"
+                            MouseLeftButtonDown="PlacementCanvas_MouseLeftButtonDown"/>
+                </Border>
+
+                <TextBlock x:Name="StatusText" Text="Кликните на поле, чтобы разместить корабль" 
+                           HorizontalAlignment="Center" Margin="0,10,0,0"/>
             </StackPanel>
         </Border>
 
-        <!-- Игровое поле для расстановки -->
-        <Border Grid.Row="1" BorderBrush="Black" BorderThickness="2" 
-                Margin="20" HorizontalAlignment="Center">
-            <Canvas Width="300" Height="300" Background="LightCyan"
-                    x:Name="PlacementField" 
-                    MouseLeftButtonDown="Field_MouseClick">
-                <!-- Сетка будет рисоваться в коде -->
-            </Canvas>
-        </Border>
-
         <!-- Панель управления -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" 
-                    HorizontalAlignment="Center" Margin="10">
-            <ComboBox x:Name="ShipSelector" Width="120" Margin="5"
-                      ItemsSource="{Binding AvailableShips}"
-                      DisplayMemberPath="Description"/>
+        <Border Grid.Row="2" Background="LightGray" Padding="15" Margin="10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button x:Name="RotateButton" Content="Повернуть корабль" 
+                        Width="150" Height="35" Margin="0,0,20,0"
+                        Click="RotateButton_Click"/>
 
-            <CheckBox Content="Горизонтально" IsChecked="{Binding IsHorizontal}"
-                      Margin="5" VerticalAlignment="Center"/>
+                <Button x:Name="RandomButton" Content="Расставить случайно" 
+                        Width="150" Height="35" Margin="0,0,20,0"
+                        Click="RandomButton_Click"/>
 
-            <Button Content="Разместить" Width="100" Margin="5"
-                    Command="{Binding PlaceShipCommand}"/>
+                <Button x:Name="ClearButton" Content="Очистить поле" 
+                        Width="150" Height="35" Margin="0,0,20,0"
+                        Click="ClearButton_Click"/>
 
-            <Button Content="Очистить поле" Width="100" Margin="5"
-                    Command="{Binding ClearFieldCommand}"/>
-
-            <Button Content="Начать игру" Width="100" Margin="5"
-                    Command="{Binding StartGameCommand}"
-                    Background="LightGreen" FontWeight="Bold"/>
-        </StackPanel>
+                <Button x:Name="ReadyButton" Content="Готово к бою!" 
+                        Width="150" Height="40" FontSize="14" FontWeight="Bold"
+                        Background="LightGreen" Click="ReadyButton_Click"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </Page>
