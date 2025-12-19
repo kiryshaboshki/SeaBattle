@@ -1,7 +1,8 @@
-﻿using SeaBattle.mvvm;
+﻿using SeaBattle.API;
+using SeaBattle.mvvm;
 using SeaBattle.View;
+using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace SeaBattle.VM
 {
@@ -19,20 +20,43 @@ namespace SeaBattle.VM
 
         public LoginVM()
         {
-            LoginCommand = new CommandVM(() =>
+            LoginCommand = new CommandVM(async () =>
             {
-                MessageBox.Show($"Вход для пользователя: {LoginText}");
-                // Здесь позже будет переход на другую страницу
+                var result = await Client.Instance.PostAsync(
+                    $"Auth/GetToken?login={LoginText}&password={passwordBox.Password}");
+
+                if (result.Success)
+                {
+                    Client.Instance.SetToken(result.Response);
+                    MessageBox.Show("Успешный вход!");
+                    // Здесь позже будет переход на список игр
+                }
+                else
+                {
+                    MessageBox.Show($"Ошибка: {result.Response}");
+                }
             });
 
-            RegistrationCommand = new CommandVM(() =>
+            RegistrationCommand = new CommandVM(async () =>
             {
-                MessageBox.Show($"Регистрация для пользователя: {LoginText}");
+                var result = await Client.Instance.PostAsync("Auth/Registration",
+                    new { Login = LoginText, Password = passwordBox.Password });
+
+                if (result.Success)
+                {
+                    MessageBox.Show("Регистрация успешна!");
+                    // Автоматически выполняем вход после регистрации
+                    LoginCommand.Execute(null);
+                }
+                else
+                {
+                    MessageBox.Show($"Ошибка регистрации: {result.Response}");
+                }
             });
         }
 
-        private PasswordBox passwordBox;
-        public void SetPasswordBox(PasswordBox box)
+        private System.Windows.Controls.PasswordBox passwordBox;
+        public void SetPasswordBox(System.Windows.Controls.PasswordBox box)
         {
             passwordBox = box;
         }

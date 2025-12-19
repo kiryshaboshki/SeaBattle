@@ -1,5 +1,5 @@
 ﻿using System.Windows.Controls;
-
+using SeaBattle.VM;
 namespace SeaBattle.View
 {
     public partial class LoginPage : Page
@@ -9,7 +9,7 @@ namespace SeaBattle.View
             InitializeComponent();
 
             // Передаем PasswordBox во ViewModel
-            var vm = (VM.LoginVM)DataContext;
+            var vm = (LoginVM)DataContext;
             vm.SetPasswordBox(PasswordBox);
         }
     }
