@@ -46,7 +46,7 @@ namespace SeaBattle.VM
             DrawGrid(enemyField);
 
             // Добавляем тестовые корабли
-            DrawTestShips();
+            //DrawTestShips();
         }
 
         private void DrawGrid(Canvas canvas)
@@ -108,22 +108,22 @@ namespace SeaBattle.VM
             }
         }
 
-        private void DrawTestShips()
-        {
-            if (myField == null) return;
+        //private void DrawTestShips()
+        //{
+        //    if (myField == null) return;
 
-            // Тестовый корабль 1x4
-            DrawShip(2, 2, 4, true, Brushes.Gray);
+        //    // Тестовый корабль 1x4
+        //    DrawShip(2, 2, 4, true, Brushes.Gray);
 
-            // Тестовый корабль 1x3
-            DrawShip(5, 5, 3, false, Brushes.Gray);
+        //    // Тестовый корабль 1x3
+        //    DrawShip(5, 5, 3, false, Brushes.Gray);
 
-            // Тестовый корабль 1x2
-            DrawShip(8, 2, 2, true, Brushes.Gray);
+        //    // Тестовый корабль 1x2
+        //    DrawShip(8, 2, 2, true, Brushes.Gray);
 
-            // Тестовый корабль 1x1
-            DrawShip(0, 8, 1, true, Brushes.Gray);
-        }
+        //    // Тестовый корабль 1x1
+        //    DrawShip(0, 8, 1, true, Brushes.Gray);
+        //}
 
         private void DrawShip(int x, int y, int size, bool horizontal, Brush color)
         {
