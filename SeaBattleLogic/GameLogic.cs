@@ -1,5 +1,6 @@
 ﻿using SeaBattleRepository.Models;
 using SeaBattleRepository.Implement;
+using SeaBattleRepository.DTO;
 
 namespace SeaBattleLogic
 {
@@ -14,24 +15,26 @@ namespace SeaBattleLogic
             _repositoryUser = repositoryUser;
         }
 
-        public async Task<Game> CreateGameAsync(int userId)
+        public async Task<GameDTO> CreateGameAsync(int userId)
         {
-            var game = new Game
+            var gameDto = new GameDTO
             {
                 CreatorUserId = userId,
                 IdUserNextTurn = userId,
-                Status = 0, // создана
-                FieldUser1 = new byte[100], // пока пустое поле
+                Status = 0,
+                FieldUser1 = new byte[100],
                 FieldUser2 = new byte[100],
                 UserIds = new List<int> { userId }
             };
-            
-            return await _repositoryGame.CreateAsync(game);
+
+            var id = await _repositoryGame.CreateAsync(gameDto);
+            gameDto.Id = id;
+            return gameDto;
         }
 
-        public List<Game> ListFreeGame(int opponentId)
+        public List<GameDTO> ListFreeGame(int opponentId)
         {
-            return _repositoryGame.GetByCondition(s => 
+            return _repositoryGame.GetByCondition(s =>
                 s.Status == 0 && 
                 s.CreatorUserId != opponentId &&
                 (s.OpponentUserId == null || s.OpponentUserId == 0)
@@ -48,26 +51,23 @@ namespace SeaBattleLogic
             if (game.Id == 0)
                 throw new Exception($"Game not found or not available: {gameId}");
                 
-            var opponent = await _repositoryUser.GetUserByIdAsync(opponentId);
-            if (opponent == null)
+            var opponent = await _repositoryUser.GetByIdAsync(opponentId);
+            if (opponent == null || opponent.Id == 0)
                 throw new Exception($"Opponent not found: {opponentId}");
 
-            // Обновляем игру
             game.OpponentUserId = opponentId;
             game.UserIds.Add(opponentId);
             
-            // Генерируем поля для обоих игроков
             var field2D_1 = FieldGeneration.Execute();
             var field2D_2 = FieldGeneration.Execute();
             
             game.FieldUser1 = FieldGeneration.GetOneDimensionField(field2D_1);
             game.FieldUser2 = FieldGeneration.GetOneDimensionField(field2D_2);
             
-            game.Status = 1; // игра началась
+            game.Status = 1;
             game.IdUserNextTurn = game.CreatorUserId;
             
             await _repositoryGame.UpdateAsync(game);
-            await _repositoryUser.AddGameToUserAsync(opponentId, gameId);
             
             return true;
         }
@@ -78,8 +78,8 @@ namespace SeaBattleLogic
             if (game.Id == 0)
                 throw new Exception($"Game not found: {gameId}");
                 
-            var user = await _repositoryUser.GetUserByIdAsync(userId);
-            if (user == null)
+            var user = await _repositoryUser.GetByIdAsync(userId); // ← GetByIdAsync
+            if (user == null || user.Id == 0)
                 throw new Exception($"User not found: {userId}");
 
             if (game.IdUserNextTurn == userId)
@@ -111,51 +111,44 @@ namespace SeaBattleLogic
             if (game.IdUserNextTurn != userId)
                 throw new Exception($"Not your turn. Next turn is for user: {game.IdUserNextTurn}");
 
-            // Проверяем координаты
             if (x < 0 || x >= 10 || y < 0 || y >= 10)
-                throw new Exception($"Invalid coordinates: x={x}, y={y} (must be 0-9)");
+                throw new Exception($"Invalid coordinates: x={x}, y={y}");
 
-            // Определяем какое поле атакуем
             var targetField = game.CreatorUserId == userId ? game.FieldUser2 : game.FieldUser1;
-            var targetCell = x + 10 * y; // поле 10x10
+            var targetCell = x + 10 * y;
             
             if (targetCell < 0 || targetCell >= 100)
                 throw new Exception($"Invalid cell index: {targetCell}");
 
-            if (targetField[targetCell] == 1) // попадание в корабль
+            if (targetField[targetCell] == 1)
             {
-                targetField[targetCell] = 2; // помечаем попадание
+                targetField[targetCell] = 2;
                 
-                // Проверяем победу (все корабли потоплены)
                 bool allShipsSunk = !targetField.Any(cell => cell == 1);
                 
                 if (allShipsSunk)
                 {
                     game.IdUserWinner = userId;
-                    game.Status = 2; // игра завершена
+                    game.Status = 2;
                     await _repositoryGame.UpdateAsync(game);
-                    
                     return TurnResult.Winner;
                 }
                 
-                game.IdUserNextTurn = userId; // повторный ход при попадании
+                game.IdUserNextTurn = userId;
                 game.DatetimeLastTurn = DateTime.Now;
                 await _repositoryGame.UpdateAsync(game);
-                
                 return TurnResult.Hit;
             }
-            else if (targetField[targetCell] == 0) // промах (пустая клетка)
+            else if (targetField[targetCell] == 0)
             {
-                targetField[targetCell] = 3; // помечаем промах
-                // Передаём ход другому игроку
+                targetField[targetCell] = 3;
                 game.IdUserNextTurn = game.CreatorUserId == userId ? 
                     (game.OpponentUserId ?? 0) : game.CreatorUserId;
                 game.DatetimeLastTurn = DateTime.Now;
                 await _repositoryGame.UpdateAsync(game);
-                
                 return TurnResult.Miss;
             }
-            else // уже стреляли сюда
+            else
             {
                 throw new Exception($"Cell already attacked: x={x}, y={y}");
             }

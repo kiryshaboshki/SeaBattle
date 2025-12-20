@@ -1,130 +1,76 @@
-﻿using SeaBattleRepository.DTO;
-using SeaBattleRepository.Models;
-using System.Text.Json;
+﻿using SeaBattleRepository.Models;
+using SeaBattleRepository.DTO;
+using System.Linq.Expressions;
 
 namespace SeaBattleRepository.Implement
 {
-    public class RepositoryUser
+    public class RepositoryUser : JsonRepositoryBase<User, UserDTO>
     {
-        private readonly string _usersFilePath = "Data/users.json";
-        private List<User> _users;
-        private readonly object _lock = new object();
+        public RepositoryGame GameRepository { get; set; }
 
-        public RepositoryUser()
+        public RepositoryUser(RepositoryGame gameRepository = null) 
+            : base(
+                toDto: UserToDto,
+                fromDto: DtoToUser
+            )
         {
-            LoadData();
+            GameRepository = gameRepository;
         }
 
-        private void LoadData()
+        protected override string FilePath => "Data/users.json";
+
+        protected override int GetId(User entity) => entity.Id;
+        protected override void SetId(User entity, int id) => entity.Id = id;
+
+        private static UserDTO UserToDto(User user)
         {
-            lock (_lock)
+            if (user == null) return new UserDTO();
+            
+            return new UserDTO
             {
-                if (File.Exists(_usersFilePath))
-                {
-                    var json = File.ReadAllText(_usersFilePath);
-                    _users = JsonSerializer.Deserialize<List<User>>(json) ?? new List<User>();
-                }
-                else
-                {
-                    _users = new List<User>();
-                    SaveUsers();
-                }
-            }
+                Id = user.Id,
+                Login = user.Login,
+                Password = user.Password,
+                Rating = user.Rating
+            };
         }
 
-        public async Task<UserDTO> SearchEntryByConditionAsync(Func<UserDTO, bool> predicate)
+        private static User DtoToUser(UserDTO dto)
         {
-            var userDTOs = _users.Select(u => new UserDTO
+            if (dto == null) return null;
+            
+            return new User
             {
-                Id = u.Id,
-                Login = u.Login,
-                Password = u.Password,
-                Rating = u.Rating
-            }).ToList();
-
-            return userDTOs.FirstOrDefault(predicate) ?? new UserDTO();
+                Id = dto.Id,
+                Login = dto.Login,
+                Password = dto.Password,
+                Rating = dto.Rating,
+                GameIds = new List<int>()
+            };
         }
 
-        public async Task<User> GetUserByIdAsync(int id)
+        public async Task<User> GetUserEntityByLoginAsync(string login)
         {
-            return _users.FirstOrDefault(u => u.Id == id);
-        }
-
-        public async Task<User> GetUserByLoginAsync(string login)
-        {
-            return _users.FirstOrDefault(u => u.Login == login);
-        }
-
-        public async Task CreateAsync(UserDTO userDTO)
-        {
-            lock (_lock)
-            {
-                var newId = _users.Any() ? _users.Max(u => u.Id) + 1 : 1;
-                
-                var user = new User
-                {
-                    Id = newId,
-                    Login = userDTO.Login,
-                    Password = userDTO.Password,
-                    Rating = userDTO.Rating
-                };
-
-                _users.Add(user);
-                SaveUsers();
-            }
-        }
-
-        public async Task UpdateAsync(User user)
-        {
-            lock (_lock)
-            {
-                var existing = _users.FirstOrDefault(u => u.Id == user.Id);
-                if (existing != null)
-                {
-                    existing.Login = user.Login;
-                    existing.Password = user.Password;
-                    existing.Rating = user.Rating;
-                    existing.GameIds = user.GameIds;
-                    SaveUsers();
-                }
-            }
-        }
-
-        public async Task SaveAsync()
-        {
-            await Task.CompletedTask;
+            return _items.FirstOrDefault(u => u.Login == login);
         }
 
         public async Task AddGameToUserAsync(int userId, int gameId)
         {
             lock (_lock)
             {
-                var user = _users.FirstOrDefault(u => u.Id == userId);
+                var user = _items.FirstOrDefault(u => u.Id == userId);
                 if (user != null && !user.GameIds.Contains(gameId))
                 {
                     user.GameIds.Add(gameId);
-                    SaveUsers();
+                    SaveData();
                 }
             }
         }
 
         public async Task<List<int>> GetUserGameIdsAsync(int userId)
         {
-            var user = _users.FirstOrDefault(u => u.Id == userId);
+            var user = _items.FirstOrDefault(u => u.Id == userId);
             return user?.GameIds ?? new List<int>();
-        }
-
-        private void SaveUsers()
-        {
-            var directory = Path.GetDirectoryName(_usersFilePath);
-            if (!Directory.Exists(directory) && directory != null)
-                Directory.CreateDirectory(directory);
-                
-            var json = JsonSerializer.Serialize(_users, new JsonSerializerOptions 
-            { 
-                WriteIndented = true 
-            });
-            File.WriteAllText(_usersFilePath, json);
         }
     }
 }

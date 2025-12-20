@@ -1,121 +1,77 @@
 ﻿using SeaBattleRepository.Models;
-using System.Text.Json;
+using SeaBattleRepository.DTO;
+using System.Linq.Expressions;
 
 namespace SeaBattleRepository.Implement
 {
-    public class RepositoryGame
+    public class RepositoryGame : JsonRepositoryBase<Game, GameDTO>
     {
-        private readonly string _gamesFilePath = "Data/games.json";
-        private List<Game> _games;
-        private readonly object _lock = new object();
-
-        public RepositoryGame()
+        public RepositoryGame() 
+            : base(
+                toDto: GameToDto,
+                fromDto: DtoToGame
+            )
         {
-            LoadData();
         }
 
-        private void LoadData()
+        protected override string FilePath => "Data/games.json";
+
+        protected override int GetId(Game entity) => entity.Id;
+        protected override void SetId(Game entity, int id) => entity.Id = id;
+
+        private static GameDTO GameToDto(Game game)
         {
-            lock (_lock)
+            if (game == null) return null;
+            
+            return new GameDTO
             {
-                if (File.Exists(_gamesFilePath))
-                {
-                    var json = File.ReadAllText(_gamesFilePath);
-                    _games = JsonSerializer.Deserialize<List<Game>>(json) ?? new List<Game>();
-                }
-                else
-                {
-                    _games = new List<Game>();
-                    SaveGames();
-                }
-            }
+                Id = game.Id,
+                Status = game.Status,
+                IdUserWinner = game.IdUserWinner,
+                CreatorUserId = game.CreatorUserId,
+                OpponentUserId = game.OpponentUserId,
+                FieldUser1 = game.FieldUser1,
+                FieldUser2 = game.FieldUser2,
+                IdUserNextTurn = game.IdUserNextTurn,
+                DatetimeLastTurn = game.DatetimeLastTurn
+            };
         }
 
-        public List<Game> GetByCondition(Func<Game, bool> predicate)
+        private static Game DtoToGame(GameDTO dto)
         {
-            return _games.Where(predicate).ToList();
-        }
-
-        public async Task<Game> GetByIdAsync(int id)
-        {
-            return _games.FirstOrDefault(g => g.Id == id);
-        }
-
-        public async Task<Game> CreateAsync(Game game)
-        {
-            lock (_lock)
+            if (dto == null) return null;
+            
+            return new Game
             {
-                var newId = _games.Any() ? _games.Max(g => g.Id) + 1 : 1;
-                game.Id = newId;
-                game.CreatedAt = DateTime.UtcNow;
-                _games.Add(game);
-                SaveGames();
-                return game;
-            }
+                Id = dto.Id,
+                Status = dto.Status,
+                IdUserWinner = dto.IdUserWinner,
+                CreatorUserId = dto.CreatorUserId,
+                OpponentUserId = dto.OpponentUserId,
+                FieldUser1 = dto.FieldUser1 ?? new byte[100],
+                FieldUser2 = dto.FieldUser2 ?? new byte[100],
+                IdUserNextTurn = dto.IdUserNextTurn,
+                DatetimeLastTurn = dto.DatetimeLastTurn,
+                UserIds = new List<int> { dto.CreatorUserId }
+            };
         }
 
-        public async Task UpdateAsync(Game game)
+        public async Task<Game> GetGameEntityByIdAsync(int id)
         {
-            lock (_lock)
-            {
-                var existing = _games.FirstOrDefault(g => g.Id == game.Id);
-                if (existing != null)
-                {
-                    existing.Status = game.Status;
-                    existing.IdUserWinner = game.IdUserWinner;
-                    existing.UserIds = game.UserIds;
-                    SaveGames();
-                }
-            }
+            return _items.FirstOrDefault(g => g.Id == id);
         }
 
         public async Task AddUserToGameAsync(int gameId, int userId)
         {
             lock (_lock)
             {
-                var game = _games.FirstOrDefault(g => g.Id == gameId);
+                var game = _items.FirstOrDefault(g => g.Id == gameId);
                 if (game != null && !game.UserIds.Contains(userId))
                 {
                     game.UserIds.Add(userId);
-                    SaveGames();
+                    SaveData();
                 }
             }
-        }
-
-        public async Task<Game> SearchEntryByConditionAsync(Func<Game, bool> predicate)
-        {
-            return _games.FirstOrDefault(predicate) ?? new Game();
-        }
-
-        public async Task<List<Game>> GetAllAsync()
-        {
-            return _games;
-        }
-
-        public async Task<Game> GetGameWithUsersAsync(int gameId, RepositoryUser userRepo)
-        {
-            var game = _games.FirstOrDefault(g => g.Id == gameId);
-            if (game == null) return new Game();
-            
-            return game;
-        }
-
-        public async Task SaveAsync()
-        {
-            await Task.CompletedTask;
-        }
-
-        private void SaveGames()
-        {
-            var directory = Path.GetDirectoryName(_gamesFilePath);
-            if (!Directory.Exists(directory) && directory != null)
-                Directory.CreateDirectory(directory);
-                
-            var json = JsonSerializer.Serialize(_games, new JsonSerializerOptions 
-            { 
-                WriteIndented = true 
-            });
-            File.WriteAllText(_gamesFilePath, json);
         }
     }
 }
