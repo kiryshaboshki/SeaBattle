@@ -1,9 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36511.14 d17.14
+VisualStudioVersion = 17.14.36511.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeaBattle", "SeaBattle\SeaBattle.csproj", "{6DB9C7BC-C096-4FF0-A826-78A593ADDFD2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeaBattleApi", "SeaBattleApi\SeaBattleApi.csproj", "{FF6BBCDA-9077-9D67-E237-1CCBAF5C5764}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeaBattleLogic", "SeaBattleLogic\SeaBattleLogic.csproj", "{70B3E1C4-08B6-4909-C896-09F6E4BDCB62}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeaBattleRepository", "SeaBattleRepository\SeaBattleRepository.csproj", "{499233E6-389D-B174-0809-60672E766EAF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +21,18 @@ Global
 		{6DB9C7BC-C096-4FF0-A826-78A593ADDFD2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6DB9C7BC-C096-4FF0-A826-78A593ADDFD2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6DB9C7BC-C096-4FF0-A826-78A593ADDFD2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF6BBCDA-9077-9D67-E237-1CCBAF5C5764}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF6BBCDA-9077-9D67-E237-1CCBAF5C5764}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF6BBCDA-9077-9D67-E237-1CCBAF5C5764}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF6BBCDA-9077-9D67-E237-1CCBAF5C5764}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70B3E1C4-08B6-4909-C896-09F6E4BDCB62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70B3E1C4-08B6-4909-C896-09F6E4BDCB62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70B3E1C4-08B6-4909-C896-09F6E4BDCB62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70B3E1C4-08B6-4909-C896-09F6E4BDCB62}.Release|Any CPU.Build.0 = Release|Any CPU
+		{499233E6-389D-B174-0809-60672E766EAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{499233E6-389D-B174-0809-60672E766EAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{499233E6-389D-B174-0809-60672E766EAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{499233E6-389D-B174-0809-60672E766EAF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
